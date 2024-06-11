@@ -234,9 +234,9 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
     def _get_new_snapshot_level_map_entry_for_current(
         self, size: Decimal
     ) -> Tuple[Decimal, Decimal]:
-        return (0, size)
+        return (Decimal(0), size)
 
     def _get_new_snapshot_level_map_entry_for_previous(
         self, size: Decimal
     ) -> Tuple[Decimal, Decimal]:
-        return (size, 0)
+        return (size, Decimal(0))
