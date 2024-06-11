@@ -1,52 +1,242 @@
+from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
+from sortedcontainers import SortedDict
+
+from lob_event_type import LOBEventType
 from lob_snapshot import LOBSnapshot
 
 
-class LOBEventType(Enum):
-    # CHANGER means that the order changed the best bid/ask price
-    # REMOVE_LIQUIDITY means that the order is a market order or is cancelled
-
-    BID_REMOVE_LIQUIDITY_ORDER_CHANGER = 1
-    ASK_REMOVE_LIQUIDITY_ORDER_CHANGER = 2
-    BID_REMOVE_LIQUIDITY_ORDER_NOT_CHANGER = 3
-    ASK_REMOVE_LIQUIDITY_ORDER_NOT_CHANGER = 4
-    BID_LIMIT_ORDER_CHANGER = 5
-    ASK_LIMIT_ORDER_CHANGER = 6
-    BID_LIMIT_ORDER_NOT_CHANGER = 7
-    ASK_LIMIT_ORDER_NOT_CHANGER = 8
-    BID_MARKET_ORDER_CHANGER = 9
-    ASK_MARKET_ORDER_CHANGER = 10
-    BID_MARKET_ORDER_NOT_CHANGER = 11
-    ASK_MARKET_ORDER_NOT_CHANGER = 12
-    BID_CANCELLED_ORDER_CHANGER = 13
-    ASK_CANCELLED_ORDER_CHANGER = 14
-    BID_CANCELLED_ORDER_NOT_CHANGER = 15
-    ASK_CANCELLED_ORDER_NOT_CHANGER = 16
+@dataclass(frozen=True)
+class LOBEventTypesContainer:
+    price_bid_event_map: SortedDict[Decimal, LOBEventType]
+    price_ask_event_map: SortedDict[Decimal, LOBEventType]
+    curr_timestamp: Optional[int]
 
 
 class LOBEventTypeReconstructor:
-    def get_happened_event_types(
+    def __init__(
+        self, num_levels_considered: int, num_levels_for_which_save_events: int
+    ):
+        """
+        Reconstruct the LOB events types occurred between two snapshots.
+        num_levels_considered is the level number to which you want to truncate the orderbook
+        num_levels_for_which_save_events is the number of level that you want to check if
+        events are happened. This is because you cannot be sure to what happens when
+        a level is not tracked anymore in these num_levels_considered. So this algorithm
+        works well for example when num_levels_for_which_save_events = 4 and
+        num_levels_for_which_save_events = 20, but we cannot be sure because if
+        there are 20 new limits with aggressive prices we will lose all the information.
+        The expectation is that such movements are very rare.
+        """
+        self._num_levels_considered = num_levels_considered
+        self._num_levels_for_which_save_events = num_levels_for_which_save_events
+        self._snapshot_levels_sorted_map_factory = (
+            LOBSideSnapshotsLevelsSortedMapFactory(self._num_levels_considered)
+        )
+
+    def get_happened_event(
         self, prev_lob_snapshot: LOBSnapshot, curr_lob_snapshot: LOBSnapshot
-    ) -> List[LOBEventType]:
-        happened_event_types = []
+    ) -> LOBEventTypesContainer:
+        price_bid_event_map = self.get_happened_event_types_for_side(
+            prev_lob_snapshot.bids_from_best, curr_lob_snapshot.bids_from_best, True
+        )
 
-    def _has_best_price_changed(
-        self,
-        prev_best_price: Decimal,
-        curr_best_price: Decimal,
-    ) -> bool:
-        return prev_best_price != curr_best_price
+        price_ask_event_map = self.get_happened_event_types_for_side(
+            prev_lob_snapshot.asks_from_best, curr_lob_snapshot.asks_from_best, False
+        )
 
-    def _is_curr_best_price_more_aggressive(
+        return LOBEventTypesContainer(
+            price_bid_event_map, price_ask_event_map, curr_lob_snapshot.timestamp
+        )
+
+    def get_happened_event_types_for_side(
         self,
-        prev_best_price: Decimal,
-        curr_best_price: Decimal,
-        is_bid_side: bool,
-    ) -> bool:
-        if is_bid_side:
-            return curr_best_price > prev_best_price
-        else:
-            return curr_best_price < prev_best_price
+        prev_side_levels_from_best: List[Tuple[float, float]],
+        curr_side_levels_from_best: List[Tuple[float, float]],
+        is_bid: bool,
+    ) -> SortedDict[Decimal, LOBEventType]:
+
+        snapshot_levels_sorted_map = (
+            self._snapshot_levels_sorted_map_factory.get_snapshots_levels_sorted_map(
+                prev_side_levels_from_best, curr_side_levels_from_best, is_bid
+            )
+        )
+
+        lob_event_types = SortedDict()
+        for i, price_level in enumerate(
+            snapshot_levels_sorted_map.get_sorted_price_levels_from_best_iterator()
+        ):
+            if i < self._num_levels_for_which_save_events:
+                is_best_level = i == 0
+
+                if snapshot_levels_sorted_map.is_cancelled(price_level):
+                    lob_event_types[price_level] = (
+                        LOBEventType.get_value_from_conditions(
+                            is_bid,
+                            False,
+                            is_best_level,
+                            is_best_level,  # Here I consider all removed liquidity at best level as market order
+                        )
+                    )
+                elif snapshot_levels_sorted_map.is_added(price_level):
+                    lob_event_types[price_level] = (
+                        LOBEventType.get_value_from_conditions(
+                            is_bid, True, is_best_level, False
+                        )
+                    )
+                elif snapshot_levels_sorted_map.is_size_decreased(price_level):
+                    lob_event_types[price_level] = (
+                        LOBEventType.get_value_from_conditions(
+                            is_bid,
+                            False,
+                            False,
+                            is_best_level,  # Here I consider all removed liquidity at best level as market order
+                        )
+                    )
+                elif snapshot_levels_sorted_map.is_size_increased(price_level):
+                    lob_event_types[price_level] = (
+                        LOBEventType.get_value_from_conditions(
+                            is_bid, True, False, False
+                        )
+                    )
+
+        return lob_event_types
+
+
+class LOBSideSnapshotsLevelsSortedMap:
+    _PREV_SNAPSHOT_INDEX = 0
+    _CURR_SNAPSHOT_INDEX = 1
+
+    def __init__(
+        self,
+        snapshots_levels_sorted_map: SortedDict[Decimal, Tuple[Decimal, Decimal]],
+        is_bid: bool,
+    ):
+        self._snapshots_levels_sorted_map = snapshots_levels_sorted_map
+        self._is_bid = is_bid
+
+    def get_size(self, price: Decimal, snapshot_index: int) -> Decimal:
+        return self._snapshots_levels_sorted_map[price][snapshot_index]
+
+    def is_cancelled(self, price: Decimal) -> bool:
+        return (
+            self.get_size(price, self._CURR_SNAPSHOT_INDEX).is_zero()
+            and not self.get_size(price, self._PREV_SNAPSHOT_INDEX).is_zero()
+        )
+
+    def is_added(self, price: Decimal) -> bool:
+        return (
+            self.get_size(price, self._PREV_SNAPSHOT_INDEX).is_zero()
+            and not self.get_size(price, self._CURR_SNAPSHOT_INDEX).is_zero()
+        )
+
+    def is_size_decreased(self, price: Decimal) -> bool:
+        return self.get_size(price, self._PREV_SNAPSHOT_INDEX) > self.get_size(
+            price, self._CURR_SNAPSHOT_INDEX
+        )
+
+    def is_size_increased(self, price: Decimal) -> bool:
+        return self.get_size(price, self._PREV_SNAPSHOT_INDEX) < self.get_size(
+            price, self._CURR_SNAPSHOT_INDEX
+        )
+
+    def get_sorted_price_levels_from_best_iterator(self):
+        return (
+            reversed(self._snapshots_levels_sorted_map.keys())
+            if self._is_bid
+            else iter(self._snapshots_levels_sorted_map.keys())
+        )
+
+
+class LOBSideSnapshotsLevelsSortedMapFactory:
+    def __init__(self, num_levels_considered: int) -> None:
+        self._num_levels_considered = num_levels_considered
+
+    def get_snapshots_levels_sorted_map(
+        self,
+        prev_side_levels_from_best: List[Tuple[Decimal, Decimal]],
+        curr_side_levels_from_best: List[Tuple[Decimal, Decimal]],
+        is_bid: bool,
+    ) -> LOBSideSnapshotsLevelsSortedMap:
+        return LOBSideSnapshotsLevelsSortedMap(
+            self._get_snapshots_levels_sorted_map_input(
+                prev_side_levels_from_best, curr_side_levels_from_best
+            ),
+            is_bid,
+        )
+
+    def _get_snapshots_levels_sorted_map_input(
+        self,
+        prev_side_levels_from_best: List[Tuple[Decimal, Decimal]],
+        curr_side_levels_from_best: List[Tuple[Decimal, Decimal]],
+    ) -> SortedDict[Decimal, Tuple[Decimal, Decimal]]:
+
+        prev_side_levels_from_best = prev_side_levels_from_best[
+            : self._num_levels_considered
+        ]
+        curr_side_levels_from_best = curr_side_levels_from_best[
+            : self._num_levels_considered
+        ]
+
+        snapshots_levels_sorted_map = self._get_snapshot_level_map_for_previous(
+            prev_side_levels_from_best
+        )
+
+        for curr_side_level in curr_side_levels_from_best:
+            curr_side_level_price = curr_side_level[LOBSnapshot.PRICE_INDEX]
+            curr_side_level_size = curr_side_level[LOBSnapshot.SIZE_INDEX]
+
+            if curr_side_level_price in snapshots_levels_sorted_map.keys():
+                snapshots_levels_sorted_map[curr_side_level_price] = (
+                    self._get_updated_snapshot_level_map_entry_with_current_size(
+                        snapshots_levels_sorted_map,
+                        curr_side_level_price,
+                        curr_side_level_size,
+                    )
+                )
+
+            else:
+                snapshots_levels_sorted_map[curr_side_level_price] = (
+                    self._get_new_snapshot_level_map_entry_for_current(
+                        curr_side_level_size
+                    )
+                )
+
+        return snapshots_levels_sorted_map
+
+    def _get_snapshot_level_map_for_previous(
+        self, prev_side_levels_from_best: List[Tuple[Decimal, Decimal]]
+    ) -> SortedDict[Decimal, Tuple[Decimal, Decimal]]:
+        snapshots_levels_sorted_map = SortedDict()
+
+        for prev_side_level in prev_side_levels_from_best:
+            snapshots_levels_sorted_map[prev_side_level[LOBSnapshot.PRICE_INDEX]] = (
+                self._get_new_snapshot_level_map_entry_for_previous(
+                    prev_side_level[LOBSnapshot.SIZE_INDEX]
+                )
+            )
+
+        return snapshots_levels_sorted_map
+
+    def _get_updated_snapshot_level_map_entry_with_current_size(
+        self,
+        snapshots_levels_sorted_map: SortedDict[Decimal, Tuple[Decimal, Decimal]],
+        curr_side_level_price: Decimal,
+        curr_side_level_size: Decimal,
+    ) -> Tuple[Decimal, Decimal]:
+        return (
+            snapshots_levels_sorted_map[curr_side_level_price][0],
+            curr_side_level_size,
+        )
+
+    def _get_new_snapshot_level_map_entry_for_current(
+        self, size: Decimal
+    ) -> Tuple[Decimal, Decimal]:
+        return (0, size)
+
+    def _get_new_snapshot_level_map_entry_for_previous(
+        self, size: Decimal
+    ) -> Tuple[Decimal, Decimal]:
+        return (size, 0)
