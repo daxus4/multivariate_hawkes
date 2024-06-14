@@ -64,6 +64,9 @@ class LOBEventTypeReconstructor:
             )
         )
 
+        # last_level_cancelled_from_market_order is needed to manage a market
+        # order that delete the first level and hit the successives
+        last_level_cancelled_from_market_order = False
         lob_event_types = SortedDict()
         for i, price_level in enumerate(
             snapshot_levels_sorted_map.get_sorted_price_levels_from_best_iterator()
@@ -77,30 +80,47 @@ class LOBEventTypeReconstructor:
                             is_bid,
                             False,
                             is_best_level,
-                            is_best_level,  # Here I consider all removed liquidity at best level as market order
+                            # Here I consider all removed liquidity at best level
+                            # as market order. Also successive levels hitted when
+                            # best level is deleted from market order
+                            is_best_level or last_level_cancelled_from_market_order,
                         )
                     )
+
+                    last_level_cancelled_from_market_order = is_best_level
+
                 elif snapshot_levels_sorted_map.is_added(price_level):
                     lob_event_types[price_level] = (
                         LOBEventType.get_value_from_conditions(
                             is_bid, True, is_best_level, False
                         )
                     )
+
+                    last_level_cancelled_from_market_order = False
+
                 elif snapshot_levels_sorted_map.is_size_decreased(price_level):
                     lob_event_types[price_level] = (
                         LOBEventType.get_value_from_conditions(
                             is_bid,
                             False,
                             False,
-                            is_best_level,  # Here I consider all removed liquidity at best level as market order
+                            # Here I consider all removed liquidity at best level
+                            # as market order. Also successive levels hitted when
+                            # best level is deleted from market order
+                            is_best_level or last_level_cancelled_from_market_order,
                         )
                     )
+
+                    last_level_cancelled_from_market_order = False
+
                 elif snapshot_levels_sorted_map.is_size_increased(price_level):
                     lob_event_types[price_level] = (
                         LOBEventType.get_value_from_conditions(
                             is_bid, True, False, False
                         )
                     )
+
+                    last_level_cancelled_from_market_order = False
 
         return lob_event_types
 
@@ -197,7 +217,7 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
                     )
                 )
 
-            else:
+            elif not (curr_side_level_price.is_nan() or curr_side_level_size.is_nan()):
                 snapshots_levels_sorted_map[curr_side_level_price] = (
                     self._get_new_snapshot_level_map_entry_for_current(
                         curr_side_level_size
@@ -212,11 +232,15 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
         snapshots_levels_sorted_map = SortedDict()
 
         for prev_side_level in prev_side_levels_from_best:
-            snapshots_levels_sorted_map[prev_side_level[LOBSnapshot.PRICE_INDEX]] = (
-                self._get_new_snapshot_level_map_entry_for_previous(
-                    prev_side_level[LOBSnapshot.SIZE_INDEX]
+            prev_side_level_price = prev_side_level[LOBSnapshot.PRICE_INDEX]
+            prev_side_level_size = prev_side_level[LOBSnapshot.SIZE_INDEX]
+
+            if not (prev_side_level_price.is_nan() or prev_side_level_size.is_nan()):
+                snapshots_levels_sorted_map[prev_side_level_price] = (
+                    self._get_new_snapshot_level_map_entry_for_previous(
+                        prev_side_level_size
+                    )
                 )
-            )
 
         return snapshots_levels_sorted_map
 

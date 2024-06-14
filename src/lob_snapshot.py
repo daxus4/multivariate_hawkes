@@ -18,12 +18,12 @@ class LOBSnapshot:
 
 
 class LOBSnapshotFactory:
-    TIMESTAMP_COLUMN = "timestamp"
+    TIMESTAMP_COLUMN = "Timestamp"
 
-    ASK_PRICE_COLUMN_PREFIX = "ask_price_"
-    ASK_SIZE_COLUMN_PREFIX = "ask_size_"
-    BID_PRICE_COLUMN_PREFIX = "bid_price_"
-    BID_SIZE_COLUMN_PREFIX = "bid_size_"
+    ASK_PRICE_COLUMN_PREFIX = "AskPrice"
+    ASK_SIZE_COLUMN_PREFIX = "AskSize"
+    BID_PRICE_COLUMN_PREFIX = "BidPrice"
+    BID_SIZE_COLUMN_PREFIX = "BidSize"
 
     COLUMN_PREFIXES = [
         ASK_PRICE_COLUMN_PREFIX,
@@ -41,14 +41,14 @@ class LOBSnapshotFactory:
         self._lob_dataframe = lob_dataframe
         self._num_levels_in_a_side = num_levels_in_a_side
 
+        if not self.TIMESTAMP_COLUMN in self._lob_dataframe.columns:
+            raise Exception("Timestamp not in column names")
+
         if not self._are_column_names_valid():
             raise Exception("Column names not valid!")
 
     def _are_column_names_valid(self) -> bool:
         column_names = self._lob_dataframe.columns
-
-        if not self.TIMESTAMP_COLUMN in column_names:
-            return False
 
         for i in range(1, self._num_levels_in_a_side + 1):
             for col_prefix in self.COLUMN_PREFIXES:
@@ -81,8 +81,6 @@ class LOBSnapshotFactory:
     def _get_side_orderbook_levels(
         self, row: pd.Series, is_bid: True
     ) -> List[Tuple[Decimal, Decimal]]:
-        orderbook_levels = []
-
         price_column_prefix = (
             self.BID_PRICE_COLUMN_PREFIX if is_bid else self.ASK_PRICE_COLUMN_PREFIX
         )
@@ -90,9 +88,14 @@ class LOBSnapshotFactory:
             self.BID_SIZE_COLUMN_PREFIX if is_bid else self.ASK_SIZE_COLUMN_PREFIX
         )
 
+        orderbook_levels = []
         for i in range(1, self._num_levels_in_a_side + 1):
             price = Decimal(row[price_column_prefix + str(i)])
             size = Decimal(row[size_column_prefix + str(i)])
+
+            if price.is_nan() or size.is_nan():
+                return orderbook_levels
+
             orderbook_levels.append((price, size))
 
         return orderbook_levels
