@@ -35,8 +35,8 @@ class LOBSnapshotFactory:
     def __init__(self, lob_dataframe: pd.DataFrame, num_levels_in_a_side: int):
         """
         Class that creates LOBSnapshot for each row of the lob_dataframe. The lob_dataframe
-        needs to contains these columns: timestamp, ask_price_1, ask_size_1, bid_price_1,
-        bid_size_1, ...
+        needs to contains these columns: Timestamp, AskPrice1, AskSize1, BidPrice1,
+        BidSize1, ...
         """
         self._lob_dataframe = lob_dataframe
         self._num_levels_in_a_side = num_levels_in_a_side
