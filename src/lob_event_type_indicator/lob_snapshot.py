@@ -1,7 +1,6 @@
-from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import ClassVar, List, Tuple
+from typing import ClassVar, Iterator, List, Tuple
 
 import pandas as pd
 
@@ -45,7 +44,7 @@ class LOBSnapshotFactory:
             raise Exception("Timestamp not in column names")
 
         if not self._are_column_names_valid():
-            raise Exception("Column names not valid!")
+            raise Exception(f"Column names not valid! {self._lob_dataframe.columns}")
 
     def _are_column_names_valid(self) -> bool:
         column_names = self._lob_dataframe.columns

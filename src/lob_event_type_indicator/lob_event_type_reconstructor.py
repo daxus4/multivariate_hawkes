@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Type
 
 from sortedcontainers import SortedDict
 
-from lob_event_type import LOBEventType
-from lob_snapshot import LOBSnapshot
+from src.lob_event_type_indicator.lob_event_type import LOBEventType
+from src.lob_event_type_indicator.lob_snapshot import LOBSnapshot
 
 
 @dataclass(frozen=True)
 class LOBEventTypesContainer:
-    price_bid_event_map: SortedDict[Decimal, LOBEventType]
-    price_ask_event_map: SortedDict[Decimal, LOBEventType]
+    price_bid_event_map: Dict[Decimal, Type[LOBEventType]]
+    price_ask_event_map: Dict[Decimal, Type[LOBEventType]]
     curr_timestamp: Optional[int]
 
 
@@ -56,7 +56,7 @@ class LOBEventTypeReconstructor:
         prev_side_levels_from_best: List[Tuple[float, float]],
         curr_side_levels_from_best: List[Tuple[float, float]],
         is_bid: bool,
-    ) -> SortedDict[Decimal, LOBEventType]:
+    ) -> Dict[Decimal, Type[LOBEventType]]:
 
         snapshot_levels_sorted_map = (
             self._snapshot_levels_sorted_map_factory.get_snapshots_levels_sorted_map(
@@ -131,7 +131,7 @@ class LOBSideSnapshotsLevelsSortedMap:
 
     def __init__(
         self,
-        snapshots_levels_sorted_map: SortedDict[Decimal, Tuple[Decimal, Decimal]],
+        snapshots_levels_sorted_map: Dict[Decimal, Tuple[Decimal, Decimal]],
         is_bid: bool,
     ):
         self._snapshots_levels_sorted_map = snapshots_levels_sorted_map
@@ -191,7 +191,7 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
         self,
         prev_side_levels_from_best: List[Tuple[Decimal, Decimal]],
         curr_side_levels_from_best: List[Tuple[Decimal, Decimal]],
-    ) -> SortedDict[Decimal, Tuple[Decimal, Decimal]]:
+    ) -> Dict[Decimal, Tuple[Decimal, Decimal]]:
 
         prev_side_levels_from_best = prev_side_levels_from_best[
             : self._num_levels_considered
@@ -228,7 +228,7 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
 
     def _get_snapshot_level_map_for_previous(
         self, prev_side_levels_from_best: List[Tuple[Decimal, Decimal]]
-    ) -> SortedDict[Decimal, Tuple[Decimal, Decimal]]:
+    ) -> Dict[Decimal, Tuple[Decimal, Decimal]]:
         snapshots_levels_sorted_map = SortedDict()
 
         for prev_side_level in prev_side_levels_from_best:
@@ -246,7 +246,7 @@ class LOBSideSnapshotsLevelsSortedMapFactory:
 
     def _get_updated_snapshot_level_map_entry_with_current_size(
         self,
-        snapshots_levels_sorted_map: SortedDict[Decimal, Tuple[Decimal, Decimal]],
+        snapshots_levels_sorted_map: Dict[Decimal, Tuple[Decimal, Decimal]],
         curr_side_level_price: Decimal,
         curr_side_level_size: Decimal,
     ) -> Tuple[Decimal, Decimal]:

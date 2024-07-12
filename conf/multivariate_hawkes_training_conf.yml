@@ -1,0 +1,10 @@
+num_levels_for_which_save_events: 4
+num_levels_in_a_side: 10
+base_imbalance_level: 10
+
+period_df_path: C:\Users\Admin\Desktop\phd\hawkes_coe\hawkes\data_BTC_USD\best_densities_full.csv
+
+seconds_in_a_period: 600
+
+lob_df_folder_path: C:\Users\Admin\Desktop\phd\hawkes_coe\bitfinex_orderbook_live\data_BTC_USD\orderbook_changes
+lob_df_file_prefix: orderbook_changes_

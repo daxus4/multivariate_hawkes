@@ -1,12 +1,15 @@
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict, List, Type
 
 import numpy as np
 import pandas as pd
 from sortedcontainers import SortedDict
 
-from lob_event_type_reconstructor import LOBEventType, LOBEventTypeReconstructor
-from lob_snapshot import LOBSnapshotFactory
+from src.lob_event_type_indicator.lob_event_type import LOBEventType
+from src.lob_event_type_indicator.lob_event_type_reconstructor import (
+    LOBEventTypeReconstructor,
+)
+from src.lob_event_type_indicator.lob_snapshot import LOBSnapshotFactory
 
 
 class LOBEventTypeIndicator:
@@ -62,7 +65,7 @@ class LOBEventTypeIndicator:
     def _update_event_type_times_map(
         self,
         event_type_times_map: Dict[LOBEventType, List[int]],
-        price_event_map: SortedDict[Decimal, LOBEventType],
+        price_event_map: Dict[Decimal, Type[LOBEventType]],
         curr_timestamp: int,
     ) -> None:
         for bid_event in price_event_map.values():
