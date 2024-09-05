@@ -34,7 +34,6 @@ class LOBEventTypeIndicator:
         event_type_times_map = dict()
 
         lob_snapshot_iterator = self._lob_snapshot_factory.get_lob_snapshots_iterator()
-
         prev_lob_snapshot = next(lob_snapshot_iterator)
 
         for curr_lob_snapshot in lob_snapshot_iterator:

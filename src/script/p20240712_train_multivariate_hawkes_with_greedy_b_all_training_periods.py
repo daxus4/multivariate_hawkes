@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -21,11 +22,36 @@ from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_greedy_be
 )
 
 
-def get_conf(path: str):
+def get_conf(path: str) -> MultivariateHawkesTrainingConf:
     with open(path, 'r') as f:
         conf = yaml.safe_load(f)
     return conf
 
+
+def get_event_type_times_maps_with_combined_types(
+    event_type_times_map: List[Dict[str, np.ndarray]],
+    combined_name_events_to_combine_map: Dict[str, List[str]]
+) -> List[Dict[str, np.ndarray]]:
+    
+    lob_event_combinator = LOBEventCombinator([event_type_times_map])
+
+    for combination_name, lob_events_to_combine in combined_name_events_to_combine_map.items():
+        event_type_times_maps = lob_event_combinator.get_event_type_times_maps_with_new_combination(
+            lob_events_to_combine,
+            combination_name=combination_name,
+        )
+        lob_event_combinator.event_type_times_maps = event_type_times_maps
+    
+    return event_type_times_maps
+
+def get_event_type_times_maps_filtered(
+    event_type_times_map: List[Dict[str, np.ndarray]],
+    events_to_compute: List[str]
+) -> List[Dict[str, np.ndarray]]:
+    return [
+        {key: value for key, value in event_type_times.items() if key in events_to_compute}
+        for event_type_times in event_type_times_map
+    ]
 
 if __name__ == "__main__":
     multivariate_hawkes_training_conf_map = get_conf(
@@ -42,9 +68,6 @@ if __name__ == "__main__":
         lob_df_folder_path=multivariate_hawkes_training_conf.lob_df_folder_path,
         lob_df_prefix=multivariate_hawkes_training_conf.lob_df_file_prefix,
     )
-
-
-    event_type_times_maps = list()
 
     for loading_info in loading_info_for_all_dfs:
         lob_df_loader = LOBDataLoader()
@@ -64,6 +87,8 @@ if __name__ == "__main__":
             lob_period = lob_period_extractor.get_lob_period(start_time, end_time)
             lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
 
+            lob_df_for_events['Timestamp'] = lob_df_for_events['Timestamp'] * 1000
+
             lob_events_extractor = MultivariateLOBEventsExtractor(
                 lob_df_for_events,
                 multivariate_hawkes_training_conf.num_levels_in_a_side,
@@ -75,32 +100,49 @@ if __name__ == "__main__":
                 key.name: value for key, value in event_type_times_map.items()
             }
 
-            event_type_times_maps.append(event_type_times_map)
+            event_type_times_maps = get_event_type_times_maps_with_combined_types(
+                event_type_times_map,
+                multivariate_hawkes_training_conf.combined_event_types_map
+            )
 
-    lob_event_combinator = LOBEventCombinator(
-        event_type_times_maps
-    )
+            event_type_times_maps = get_event_type_times_maps_filtered(
+                event_type_times_maps,
+                multivariate_hawkes_training_conf.events_to_compute
+            )
 
-    event_type_times_maps = lob_event_combinator.get_event_type_times_maps_with_new_combination(
-        CONST.LOB_EVENT_TO_COMBINE,
-        combination_name = CONST.MID_PRICE_CHANGE_EVENT_NAME,
-    )
+            event_type_times_map_formatter = EventTypeTimesMapsFormatter()
 
-    event_type_times_map_formatter = EventTypeTimesMapsFormatter()
+            event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
+                event_type_times_maps,
+                multivariate_hawkes_training_conf.events_to_compute
+            )
 
-    event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
-        event_type_times_maps
-    )
+            event_type_times_formatted_in_seconds = [
+                [times / 1000 for times in event_type_times]
+                for event_type_times in event_type_times_formatted
+            ]
 
-    trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
-        event_type_times_formatted, CONST.BETA_TO_TRAIN
-    )
-    hawkes_kernel = trainer.get_trained_kernel(CONST.BETA_VALUE_TO_TEST)
+            trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
+                event_type_times_formatted_in_seconds, multivariate_hawkes_training_conf.betas_to_train
+            )
+            hawkes_kernel = trainer.get_trained_kernel(multivariate_hawkes_training_conf.beta_values_to_test)
 
-    prefix = os.path.basename(multivariate_hawkes_training_conf.period_df_path)
-    prefix = os.path.join(CONST.DATA_FOLDER, CONST.HAWKES_PARAMETERS_FOLDER, prefix)
-    
-    np.savetxt(f'{prefix}_mu', hawkes_kernel.baseline)
-    np.savetxt(f'{prefix}_alpha', hawkes_kernel.adjacency)
-    np.savetxt(f'{prefix}_beta', hawkes_kernel.decays)
-             
+            prefix = os.path.basename(loading_info.path)
+            prefix = os.path.splitext(prefix)[0]
+            prefix = os.path.join(CONST.DATA_FOLDER, CONST.HAWKES_PARAMETERS_FOLDER, prefix)
+
+            np.savetxt(f'{prefix}_{start_simulation_time}_mu.txt', hawkes_kernel.baseline)
+            np.savetxt(f'{prefix}_{start_simulation_time}_alpha.txt', hawkes_kernel.adjacency)
+            np.savetxt(f'{prefix}_{start_simulation_time}_beta.txt', hawkes_kernel.decays)
+
+    with open(
+        os.path.join(
+            CONST.DATA_FOLDER,
+            CONST.HAWKES_PARAMETERS_FOLDER,
+            "order_of_events_type.txt"
+        ),
+        'w'
+    ) as file:
+        file.writelines(
+            f"{item}\n" for item in multivariate_hawkes_training_conf.events_to_compute
+        )

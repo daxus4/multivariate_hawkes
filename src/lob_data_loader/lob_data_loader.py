@@ -12,6 +12,7 @@ class LOBDataLoader:
     def _get_preprocessed_df(
         self, df: pd.DataFrame, base_imbalance_orderbook_level: int
     ) -> pd.DataFrame:
+        df["Timestamp"] = df["Timestamp"] / 1000
         df['MidPrice'] = (df["AskPrice1"]+df["BidPrice1"])/2
         df['Return'] = (-df["MidPrice"]+df["MidPrice"].shift(-1)) / df["MidPrice"]
 

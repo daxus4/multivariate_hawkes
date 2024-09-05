@@ -7,6 +7,14 @@ class LOBEventCombinator:
     def __init__(self, event_type_times_maps: List[Dict[str, np.ndarray]]) -> None:
         self._event_type_times_maps = event_type_times_maps
 
+    @property
+    def event_type_times_maps(self) -> List[Dict[str, np.ndarray]]:
+        return self._event_type_times_maps
+    
+    @event_type_times_maps.setter
+    def event_type_times_maps(self, event_type_times_maps: List[Dict[str, np.ndarray]]) -> None:
+        self._event_type_times_maps = event_type_times_maps
+
     def get_event_type_times_maps_with_new_combination(
         self,
         lob_event_types_to_combine: List[str],
@@ -49,7 +57,11 @@ class LOBEventCombinator:
         event_type_times_map: Dict[str, np.ndarray],
         lob_event_types_to_combine: List[str],
     ) -> np.ndarray:
-        arrays = [event_type_times_map[key] for key in lob_event_types_to_combine]
+        arrays = [
+            event_type_times_map[key]
+            for key in lob_event_types_to_combine
+            if key in event_type_times_map
+        ]
         combined_array = np.concatenate(arrays)
 
         sorted_array = np.sort(combined_array)

@@ -19,7 +19,7 @@ class MultivariateHawkesTrainerWithGreedyBetaSearch:
         )
 
         current_hawkes_kernel = self._get_hawkes_exp_kernel(
-            current_betas_matrix, self._event_types_periods
+            current_betas_matrix, self._event_types_periods[0]
         )
         best_score = current_hawkes_kernel.score()
         improvement = True
@@ -56,10 +56,10 @@ class MultivariateHawkesTrainerWithGreedyBetaSearch:
         return best_hawkes_kernel
 
     def _get_hawkes_exp_kernel(
-        beta_matrix: np.ndarray, timestamps: List[List[np.ndarray]]
+        self, beta_matrix: np.ndarray, timestamps: List[List[np.ndarray]]
     ) -> HawkesExpKern:
-        kernel = HawkesExpKern(beta_matrix)
-        kernel.fit(timestamps, penalty='l1')
+        kernel = HawkesExpKern(beta_matrix, penalty='l1')
+        kernel.fit(timestamps)
 
         return kernel
 
