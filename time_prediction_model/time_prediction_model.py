@@ -20,7 +20,7 @@ class TimePredictionModel(ABC):
     @abstractmethod
     def predict_next_event_time_from_current_time(
         self, event_times: List[np.ndarray], current_time: float, **kwargs
-    ) -> float:
+    ) -> Dict[str, float]:
         pass
 
     @property
