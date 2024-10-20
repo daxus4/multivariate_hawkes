@@ -108,7 +108,7 @@ if __name__ == "__main__":
         for loading_info in loading_info_for_all_dfs:
             lob_df_loader = LOBDataLoader()
             lob_df = lob_df_loader.get_lob_dataframe(
-                loading_info.path, testing_conf.base_imbalance_level
+                loading_info.path, 10
             )
 
             lob_period_extractor = LOBPeriodExtractor(lob_df)
@@ -143,16 +143,12 @@ if __name__ == "__main__":
                     events_conf.events_to_compute
                 )
 
-                event_type_times_map_formatter = EventTypeTimesMapsFormatter()
-
-                event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
-                    event_type_times_maps,
-                    events_conf.events_to_compute
-                )
-
-                event_type_times_formatted_in_seconds = [
-                    [times / 1000 for times in event_type_times]
-                    for event_type_times in event_type_times_formatted
+                event_type_times_maps_formatted_in_seconds = [
+                    {
+                        event_type:(times / 1000)
+                        for event_type, times in event_type_times_map.items()
+                    }
+                    for event_type_times_map in event_type_times_maps
                 ]
 
                 time_prediction_model_factory = TimePredictionModelFactory(
@@ -162,7 +158,6 @@ if __name__ == "__main__":
                         CONST.TRAINED_PARAMS_FOLDER,
                         run_info.model_name,
                         testing_conf.pair,
-                        CONST.BASE_IMBALANCE_FOLDER_PREFIX + str(testing_conf.base_imbalance_level),
                     ),
                     loading_info.start_registration_time,
                     start_simulation_time,
@@ -171,7 +166,7 @@ if __name__ == "__main__":
                 time_prediction_model = time_prediction_model_factory.get_model()
 
                 period_for_simulation = PeriodForSimulation(
-                    event_type_event_times_map=event_type_times_map,
+                    event_type_event_times_map=event_type_times_maps_formatted_in_seconds[0],
                     event_types_to_predict=['MID_PRICE_CHANGE'],
                     event_types_order=events_conf.events_to_compute
                 )
@@ -196,8 +191,7 @@ if __name__ == "__main__":
                 simulations_dir = os.path.join(
                     CONST.SIMULATIONS_FOLDER,
                     run_info.model_name,
-                    testing_conf.pair,
-                    CONST.BASE_IMBALANCE_FOLDER_PREFIX + str(testing_conf.base_imbalance_level)
+                    testing_conf.pair
                 )
 
                 if not os.path.exists(simulations_dir):
@@ -212,8 +206,8 @@ if __name__ == "__main__":
 
                 df.to_csv(
                     os.path.join(
-                        simulations_dir,
-                        f'{prefix}_{start_simulation_time}.tsv'),
+                        f'{prefix}_{start_simulation_time}.tsv'
+                    ),
                     index=False,
                     sep='\t'
                 )

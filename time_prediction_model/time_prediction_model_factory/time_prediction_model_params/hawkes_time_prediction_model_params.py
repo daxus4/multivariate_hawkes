@@ -40,7 +40,7 @@ class HawkesTimePredictionModelParams(PoissonTimePredictionModelParams):
         )
 
         params_dict.update({
-            "order_events": order_events,
+            "event_types_order": order_events,
             "alpha": alpha,
             "beta": beta
         })

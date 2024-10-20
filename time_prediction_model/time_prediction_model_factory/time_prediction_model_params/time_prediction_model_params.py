@@ -27,8 +27,8 @@ class TimePredictionModelParams:
             
         prefix_with_interrupted = (
             ORDERBOOK_CHANGES_FILE_PREFIX +
-            file_start_registration_time + "_interrupted_" +
-            file_start_simulation_time
+            str(file_start_registration_time) + "_interrupted_" +
+            str(file_start_simulation_time)
         )
 
         for file_name in os.listdir(folder_path):

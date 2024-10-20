@@ -9,7 +9,6 @@ CONF_EVENTS_FOLDER = os.path.join(CONF_FOLDER, "conf_events")
 DATA_FOLDER = "data"
 ORDERBOOK_CHANGES_FOLDER = os.path.join(DATA_FOLDER, "orderbook_changes")
 TRAINED_PARAMS_FOLDER = os.path.join(DATA_FOLDER, "trained_params")
-BASE_IMBALANCE_FOLDER_PREFIX = 'base_imbalance_'
 SIMULATIONS_FOLDER = os.path.join(DATA_FOLDER, "simulations")
 
 # Files

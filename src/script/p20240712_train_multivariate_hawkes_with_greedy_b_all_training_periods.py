@@ -107,7 +107,7 @@ if __name__ == "__main__":
     for loading_info in loading_info_for_all_dfs:
         lob_df_loader = LOBDataLoader()
         lob_df = lob_df_loader.get_lob_dataframe(
-            loading_info.path, training_conf.base_imbalance_level
+            loading_info.path, 10
         )
 
         lob_period_extractor = LOBPeriodExtractor(lob_df)
@@ -166,8 +166,7 @@ if __name__ == "__main__":
             params_dir = os.path.join(
                 CONST.TRAINED_PARAMS_FOLDER,
                 CONST.MULTIVARIATE_HAWKES,
-                training_conf.pair,
-                CONST.BASE_IMBALANCE_FOLDER_PREFIX + training_conf.base_imbalance_level,
+                training_conf.pair
             )
 
             if not os.path.exists(params_dir):
