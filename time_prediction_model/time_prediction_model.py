@@ -9,7 +9,6 @@ class TimePredictionModel(ABC):
         self._parameters = params
 
 
-    @abstractmethod
     def predict_next_event_time_from_last_event(
         self, event_times: List[np.ndarray], **kwargs
     ) -> float:

@@ -24,6 +24,15 @@ class PeriodForSimulation:
             for event_type in self._event_types_order
         ]
     
+    def get_ordered_event_times(
+        self,
+        event_types_order: List[str]
+    ) -> List[np.ndarray]:
+        return [
+            self._event_type_event_times_map[event_type]
+            for event_type in event_types_order
+        ]
+    
     def get_period_from_time(self, time: float) -> 'PeriodForSimulation':
         return PeriodForSimulation(
             {

@@ -1,0 +1,4 @@
+pair: "BTC_USD"
+base_imbalance_level: 10
+seconds_simulation_period: 120 
+seconds_warm_up_period: 120

@@ -5,8 +5,12 @@ import numpy as np
 import pandas as pd
 import yaml
 
-import src.multivariate_hawkes_training.constants as CONST
-from src.conf.multivariate_hawkes_training_conf import MultivariateHawkesTrainingConf
+import src.constants as CONST
+from src.conf.events_conf.events_conf import EventsConf
+from src.conf.training.model.multivariate_hawkes_training_conf import (
+    MultivariateHawkesTrainingConf,
+)
+from src.conf.training.training_conf import TrainingConf
 from src.events_extractor.multivariate_lob_events_extractor import (
     MultivariateLOBEventsExtractor,
 )
@@ -21,8 +25,11 @@ from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_greedy_be
     MultivariateHawkesTrainerWithGreedyBetaSearch,
 )
 
+CONF_EVENTS_FILENAME = "all_best_price_changes_events_conf.yml"
+CONF_TRAINING_FILENAME = "training_conf.yml"
+CONF_MULTIVARIATE_HAWKES_TRAINING_FILENAME = "multivariate_hawkes_training_conf.yml"
 
-def get_conf(path: str) -> MultivariateHawkesTrainingConf:
+def get_conf(path: str) -> Dict:
     with open(path, 'r') as f:
         conf = yaml.safe_load(f)
     return conf
@@ -55,31 +62,59 @@ def get_event_type_times_maps_filtered(
 
 if __name__ == "__main__":
     multivariate_hawkes_training_conf_map = get_conf(
-        os.path.join(CONST.CONF_FOLDER, CONST.MULTIVARIATE_HAWKES_TRAINING_CONF_FILE)
+        os.path.join(
+            CONST.CONF_TRAINING_MODEL_FOLDER,
+            CONF_MULTIVARIATE_HAWKES_TRAINING_FILENAME
+        )
     )
-
     multivariate_hawkes_training_conf = MultivariateHawkesTrainingConf.from_dict(
         multivariate_hawkes_training_conf_map
     )
 
-    periods_df = pd.read_csv(multivariate_hawkes_training_conf.period_df_path)
+    training_conf_map = get_conf(
+        os.path.join(
+            CONST.CONF_TRAINING_FOLDER,
+            CONF_TRAINING_FILENAME
+        )
+    )
+    training_conf = TrainingConf.from_dict(
+        training_conf_map
+    )
+
+    events_conf_map = get_conf(
+        os.path.join(
+            CONST.CONF_EVENTS_FOLDER,
+            CONF_EVENTS_FILENAME
+        )
+    )
+    events_conf = EventsConf.from_dict(
+        events_conf_map
+    )
+
+    pair_orderbook_changes_path = os.path.join(
+        CONST.ORDERBOOK_CHANGES_FOLDER,
+        training_conf.pair
+    )
+    periods_df = pd.read_csv(
+        os.path.join(pair_orderbook_changes_path, CONST.BEST_DENSITIES_FILE)
+    )
 
     loading_info_for_all_dfs = LoadingInfoGetter(periods_df).get_loading_info(
-        lob_df_folder_path=multivariate_hawkes_training_conf.lob_df_folder_path,
-        lob_df_prefix=multivariate_hawkes_training_conf.lob_df_file_prefix,
+        lob_df_folder_path=pair_orderbook_changes_path,
+        lob_df_prefix=CONST.ORDERBOOK_CHANGES_FILE_PREFIX,
     )
 
     for loading_info in loading_info_for_all_dfs:
         lob_df_loader = LOBDataLoader()
         lob_df = lob_df_loader.get_lob_dataframe(
-            loading_info.path, multivariate_hawkes_training_conf.base_imbalance_level
+            loading_info.path, training_conf.base_imbalance_level
         )
 
         lob_period_extractor = LOBPeriodExtractor(lob_df)
 
         for start_simulation_time in loading_info.start_times:
             start_time = (
-                start_simulation_time - multivariate_hawkes_training_conf.seconds_in_a_period
+                start_simulation_time - training_conf.seconds_in_a_period
             )
 
             end_time = start_simulation_time
@@ -91,8 +126,8 @@ if __name__ == "__main__":
 
             lob_events_extractor = MultivariateLOBEventsExtractor(
                 lob_df_for_events,
-                multivariate_hawkes_training_conf.num_levels_in_a_side,
-                multivariate_hawkes_training_conf.num_levels_for_which_save_events
+                events_conf.num_levels_in_a_side,
+                events_conf.num_levels_for_which_save_events
             )
 
             event_type_times_map = lob_events_extractor.get_events()
@@ -102,19 +137,19 @@ if __name__ == "__main__":
 
             event_type_times_maps = get_event_type_times_maps_with_combined_types(
                 event_type_times_map,
-                multivariate_hawkes_training_conf.combined_event_types_map
+                events_conf.combined_event_types_map
             )
 
             event_type_times_maps = get_event_type_times_maps_filtered(
                 event_type_times_maps,
-                multivariate_hawkes_training_conf.events_to_compute
+                events_conf.events_to_compute
             )
 
             event_type_times_map_formatter = EventTypeTimesMapsFormatter()
 
             event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
                 event_type_times_maps,
-                multivariate_hawkes_training_conf.events_to_compute
+                events_conf.events_to_compute
             )
 
             event_type_times_formatted_in_seconds = [
@@ -123,13 +158,27 @@ if __name__ == "__main__":
             ]
 
             trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
-                event_type_times_formatted_in_seconds, multivariate_hawkes_training_conf.betas_to_train
+                event_type_times_formatted_in_seconds,
+                multivariate_hawkes_training_conf.betas_to_train
             )
             hawkes_kernel = trainer.get_trained_kernel(multivariate_hawkes_training_conf.beta_values_to_test)
 
+            params_dir = os.path.join(
+                CONST.TRAINED_PARAMS_FOLDER,
+                CONST.MULTIVARIATE_HAWKES,
+                training_conf.pair,
+                CONST.BASE_IMBALANCE_FOLDER_PREFIX + training_conf.base_imbalance_level,
+            )
+
+            if not os.path.exists(params_dir):
+                os.makedirs(params_dir, exist_ok=True)
+
             prefix = os.path.basename(loading_info.path)
             prefix = os.path.splitext(prefix)[0]
-            prefix = os.path.join(CONST.DATA_FOLDER, CONST.HAWKES_PARAMETERS_FOLDER, prefix)
+            prefix = os.path.join(
+                params_dir,
+                prefix
+            )
 
             np.savetxt(f'{prefix}_{start_simulation_time}_mu.txt', hawkes_kernel.baseline)
             np.savetxt(f'{prefix}_{start_simulation_time}_alpha.txt', hawkes_kernel.adjacency)
@@ -137,12 +186,11 @@ if __name__ == "__main__":
 
     with open(
         os.path.join(
-            CONST.DATA_FOLDER,
-            CONST.HAWKES_PARAMETERS_FOLDER,
-            "order_of_events_type.txt"
+            params_dir,
+            CONST.ORDER_OF_EVENT_TYPES_FILE
         ),
         'w'
     ) as file:
         file.writelines(
-            f"{item}\n" for item in multivariate_hawkes_training_conf.events_to_compute
+            f"{item}\n" for item in events_conf.events_to_compute
         )

@@ -8,6 +8,7 @@ import pandas as pd
 @dataclass
 class LoadingInfo:
     path: str
+    start_registration_time: int
     start_times: List[float]
 
 class LoadingInfoGetter:
@@ -30,7 +31,7 @@ class LoadingInfoGetter:
             self._period_df['timestamp'], self._period_df['timestamp_density']
         ):
             path = self._get_lob_df_path(lob_df_folder_path, lob_df_prefix, df_timestamp)
-            loading_info = LoadingInfo(path, starting_time_periods)
+            loading_info = LoadingInfo(path, df_timestamp, starting_time_periods)
             loading_infos.append(loading_info)
 
         return loading_infos

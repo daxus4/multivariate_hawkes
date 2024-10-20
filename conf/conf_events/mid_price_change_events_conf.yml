@@ -1,0 +1,16 @@
+num_levels_for_which_save_events: 1
+num_levels_in_a_side: 4
+
+combined_event_types_map:
+  MID_PRICE_CHANGE:
+  - "BID_REMOVE_LIQUIDITY_ORDER_CHANGER"
+  - "ASK_REMOVE_LIQUIDITY_ORDER_CHANGER"
+  - "BID_LIMIT_ORDER_CHANGER"
+  - "ASK_LIMIT_ORDER_CHANGER"
+  - "BID_MARKET_ORDER_CHANGER"
+  - "ASK_MARKET_ORDER_CHANGER"
+  - "BID_CANCELLED_ORDER_CHANGER"
+  - "ASK_CANCELLED_ORDER_CHANGER"
+
+events_to_compute:
+  - MID_PRICE_CHANGE
