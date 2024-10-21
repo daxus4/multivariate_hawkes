@@ -25,7 +25,7 @@ from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_greedy_be
     MultivariateHawkesTrainerWithGreedyBetaSearch,
 )
 
-CONF_EVENTS_FILENAME = "all_best_price_changes_events_conf.yml"
+CONF_EVENTS_FILENAME = "mid_price_change_and_sublevels_events_conf.yml"
 CONF_TRAINING_FILENAME = "training_conf.yml"
 CONF_MULTIVARIATE_HAWKES_TRAINING_FILENAME = "multivariate_hawkes_training_conf.yml"
 

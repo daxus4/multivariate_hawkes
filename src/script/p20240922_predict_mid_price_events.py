@@ -17,9 +17,6 @@ from src.events_extractor.multivariate_lob_events_extractor import (
 from src.lob_data_loader.loading_info_getter import LoadingInfoGetter
 from src.lob_data_loader.lob_data_loader import LOBDataLoader
 from src.lob_period.lob_period_extractor import LOBPeriodExtractor
-from src.multivariate_hawkes_training.event_type_times_maps_formatter import (
-    EventTypeTimesMapsFormatter,
-)
 from src.multivariate_hawkes_training.lob_event_combinator import LOBEventCombinator
 from src.parser.predict_events_parser import PredictEventParser
 from src.parser.predict_events_run_info import PredictEventsRunInfo

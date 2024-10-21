@@ -1,6 +1,8 @@
 import os
 from typing import List
 
+import numpy as np
+
 from src.constants import ORDER_OF_EVENT_TYPES_FILE
 from time_prediction_model.time_prediction_model_factory.time_prediction_model_params.poisson_time_prediction_model_params import (
     PoissonTimePredictionModelParams,
@@ -33,11 +35,18 @@ class HawkesTimePredictionModelParams(PoissonTimePredictionModelParams):
             "alpha"
         )
 
+        if alpha.shape == ():
+            alpha = np.reshape(alpha, (1, 1))
+
         beta = cls._get_param_from_file(
             folder_path,
             prefix_filename,
             "beta"
         )
+
+        if beta.shape == ():
+            beta = np.reshape(beta, (1, 1))
+
 
         params_dict.update({
             "event_types_order": order_events,

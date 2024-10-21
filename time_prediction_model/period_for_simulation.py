@@ -70,7 +70,6 @@ class PeriodForSimulation:
         )
         
     def get_event_type_event_times_map_to_predict(self) -> Dict[str, np.ndarray]:
-        print(self._event_type_event_times_map.keys())
         return {
             event_type: self._event_type_event_times_map[event_type]
             for event_type in self._event_types_to_predict

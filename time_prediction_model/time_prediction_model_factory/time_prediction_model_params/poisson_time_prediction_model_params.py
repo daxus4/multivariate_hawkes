@@ -36,6 +36,9 @@ class PoissonTimePredictionModelParams(TimePredictionModelParams):
             "mu"
         )
 
+        if mu.shape == ():
+            mu = np.reshape(mu, (1,))
+
         params_dict = {
             "mu": mu
         }

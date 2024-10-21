@@ -29,11 +29,14 @@ class HawkesTimePredictionModel(TimePredictionModel):
 
         simulated_hawkes = self._get_hawkes_simulation(
             event_times,
-            current_time + self._prediction_period_duration,
+            current_time,
             self._seed
         )
 
-        predicted_timestamps: List[np.ndarray] = simulated_hawkes.timestamps
+        predicted_timestamps = self._get_new_simulated_timestamps(
+            simulated_hawkes,
+            current_time,
+        )
 
         return {
             event_type: predicted_timestamps[i]
@@ -43,24 +46,44 @@ class HawkesTimePredictionModel(TimePredictionModel):
     def _get_hawkes_simulation(
         self,
         event_times: List[np.ndarray],
-        max_simulated_time: float,
+        current_time: float,
         seed: int,
     ) -> hk.SimuHawkesExpKernels:
         sim_hawkes = hk.SimuHawkesExpKernels(
             adjacency=self._get_alpha_converted_for_simulation(),
             decays=self._get_beta_converted_for_simulation(),
             baseline=self._get_mu_converted_for_simulation(),
-            end_time=max_simulated_time, # vedere se usare max_jumps al posto di end_time
-            seed=seed
+            end_time=current_time,
+            seed=seed,
+            verbose=False, 
         )
         sim_hawkes.track_intensity(1)
 
-        sim_hawkes.set_timestamps(event_times, max_simulated_time)
-        sim_hawkes.end_time = max_simulated_time
+        sim_hawkes.set_timestamps(event_times, current_time)
+        sim_hawkes.end_time = current_time + self._prediction_period_duration
 
         sim_hawkes.simulate()
 
         return sim_hawkes
+
+    def _get_new_simulated_timestamps(
+        self,
+        simulated_hawkes: hk.SimuHawkesExpKernels,
+        current_time: float,
+    ) -> np.ndarray:
+        new_simulated_timestamps = [
+            np.array([t for t in timestamps if t > current_time])
+            for timestamps in simulated_hawkes.timestamps
+        ]
+
+        # add max_simulated_time to timestamps that are empty
+        for i, timestamps in enumerate(new_simulated_timestamps):
+            if len(timestamps) == 0:
+                new_simulated_timestamps[i] = np.array(
+                    [current_time + self._prediction_period_duration]
+                )
+
+        return new_simulated_timestamps
 
     def _get_alpha_converted_for_simulation(self) -> np.ndarray:
         return self._parameters['alpha']
