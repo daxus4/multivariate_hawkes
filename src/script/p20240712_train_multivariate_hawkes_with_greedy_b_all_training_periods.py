@@ -113,75 +113,77 @@ if __name__ == "__main__":
         lob_period_extractor = LOBPeriodExtractor(lob_df)
 
         for start_simulation_time in loading_info.start_times:
-            start_time = (
-                start_simulation_time - training_conf.seconds_in_a_period
-            )
+            for training_time_seconds in training_conf.seconds_in_a_period:
+                start_time = (
+                    start_simulation_time - training_time_seconds
+                )
 
-            end_time = start_simulation_time
+                end_time = start_simulation_time
 
-            lob_period = lob_period_extractor.get_lob_period(start_time, end_time)
-            lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
+                lob_period = lob_period_extractor.get_lob_period(start_time, end_time)
+                lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
 
-            lob_df_for_events['Timestamp'] = lob_df_for_events['Timestamp'] * 1000
+                lob_df_for_events['Timestamp'] = lob_df_for_events['Timestamp'] * 1000
 
-            lob_events_extractor = MultivariateLOBEventsExtractor(
-                lob_df_for_events,
-                events_conf.num_levels_in_a_side,
-                events_conf.num_levels_for_which_save_events
-            )
+                lob_events_extractor = MultivariateLOBEventsExtractor(
+                    lob_df_for_events,
+                    events_conf.num_levels_in_a_side,
+                    events_conf.num_levels_for_which_save_events
+                )
 
-            event_type_times_map = lob_events_extractor.get_events()
-            event_type_times_map = {
-                key.name: value for key, value in event_type_times_map.items()
-            }
+                event_type_times_map = lob_events_extractor.get_events()
+                event_type_times_map = {
+                    key.name: value for key, value in event_type_times_map.items()
+                }
 
-            event_type_times_maps = get_event_type_times_maps_with_combined_types(
-                event_type_times_map,
-                events_conf.combined_event_types_map
-            )
+                event_type_times_maps = get_event_type_times_maps_with_combined_types(
+                    event_type_times_map,
+                    events_conf.combined_event_types_map
+                )
 
-            event_type_times_maps = get_event_type_times_maps_filtered(
-                event_type_times_maps,
-                events_conf.events_to_compute
-            )
+                event_type_times_maps = get_event_type_times_maps_filtered(
+                    event_type_times_maps,
+                    events_conf.events_to_compute
+                )
 
-            event_type_times_map_formatter = EventTypeTimesMapsFormatter()
+                event_type_times_map_formatter = EventTypeTimesMapsFormatter()
 
-            event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
-                event_type_times_maps,
-                events_conf.events_to_compute
-            )
+                event_type_times_formatted = event_type_times_map_formatter.get_events_types_periods(
+                    event_type_times_maps,
+                    events_conf.events_to_compute
+                )
 
-            event_type_times_formatted_in_seconds = [
-                [times / 1000 for times in event_type_times]
-                for event_type_times in event_type_times_formatted
-            ]
+                event_type_times_formatted_in_seconds = [
+                    [times / 1000 for times in event_type_times]
+                    for event_type_times in event_type_times_formatted
+                ]
 
-            trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
-                event_type_times_formatted_in_seconds,
-                multivariate_hawkes_training_conf.betas_to_train
-            )
-            hawkes_kernel = trainer.get_trained_kernel(multivariate_hawkes_training_conf.beta_values_to_test)
+                trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
+                    event_type_times_formatted_in_seconds,
+                    multivariate_hawkes_training_conf.betas_to_train
+                )
+                hawkes_kernel = trainer.get_trained_kernel(multivariate_hawkes_training_conf.beta_values_to_test)
 
-            params_dir = os.path.join(
-                CONST.TRAINED_PARAMS_FOLDER,
-                CONST.MULTIVARIATE_HAWKES,
-                training_conf.pair
-            )
+                params_dir = os.path.join(
+                    CONST.TRAINED_PARAMS_FOLDER,
+                    CONST.MULTIVARIATE_HAWKES,
+                    training_conf.pair,
+                    "training_time_" + str(training_time_seconds)
+                )
 
-            if not os.path.exists(params_dir):
-                os.makedirs(params_dir, exist_ok=True)
+                if not os.path.exists(params_dir):
+                    os.makedirs(params_dir, exist_ok=True)
 
-            prefix = os.path.basename(loading_info.path)
-            prefix = os.path.splitext(prefix)[0]
-            prefix = os.path.join(
-                params_dir,
-                prefix
-            )
+                prefix = os.path.basename(loading_info.path)
+                prefix = os.path.splitext(prefix)[0]
+                prefix = os.path.join(
+                    params_dir,
+                    prefix
+                )
 
-            np.savetxt(f'{prefix}_{start_simulation_time}_mu.txt', hawkes_kernel.baseline)
-            np.savetxt(f'{prefix}_{start_simulation_time}_alpha.txt', hawkes_kernel.adjacency)
-            np.savetxt(f'{prefix}_{start_simulation_time}_beta.txt', hawkes_kernel.decays)
+                np.savetxt(f'{prefix}_{start_simulation_time}_mu.txt', hawkes_kernel.baseline)
+                np.savetxt(f'{prefix}_{start_simulation_time}_alpha.txt', hawkes_kernel.adjacency)
+                np.savetxt(f'{prefix}_{start_simulation_time}_beta.txt', hawkes_kernel.decays)
 
     with open(
         os.path.join(

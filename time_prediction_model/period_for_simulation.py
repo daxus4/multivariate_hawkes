@@ -61,7 +61,7 @@ class PeriodForSimulation:
         return PeriodForSimulation(
             {
                 event_type: event_times[
-                    (event_times >= start_time) & (event_times <= end_time)
+                    (event_times >= start_time) & (event_times < end_time)
                 ]
                 for event_type, event_times in self._event_type_event_times_map.items()
             },

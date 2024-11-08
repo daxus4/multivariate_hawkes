@@ -17,10 +17,10 @@ class NaiveTimePredictionModel(TimePredictionModel):
         )
 
         next_event_times = {
-            event_type: self._get_predicted_event_after_current_time(
+            event_type: [self._get_predicted_event_after_current_time(
                 event_times[-1], current_time, self._parameters["next_event_time_jump"]
-            )
-            for event_type, event_times in event_type_event_times_map_to_predict
+            )]
+            for event_type, event_times in event_type_event_times_map_to_predict.items()
         }
 
         return next_event_times

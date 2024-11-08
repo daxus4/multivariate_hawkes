@@ -3,19 +3,22 @@ import os
 import pandas as pd
 
 pairs = ['BTC_USD', 'ETH_USD', 'BTC_USDT', 'ETH_USDT', 'ETH_BTC']
-training_times = [300, 600, 900]
+window_duration_seconds = [30, 60, 120, 180, 240]
 
 for pair in pairs:
-    for training_time in training_times:
+    for window_duration_second in window_duration_seconds:
         # Define the folder path where your orderbook files are located
         orderbook_changes_path = f'C:\\Users\\Admin\\Desktop\\phd\\multivariate_hawkes\\data\\orderbook_changes\\' + pair + '\\'
-        params_path = 'C:\\Users\\Admin\\Desktop\\phd\\multivariate_hawkes\\data\\trained_params\\univariate_hawkes\\' + pair + '\\training_time_' + str(training_time) + '\\'
+        params_path = (
+            'C:\\Users\\Admin\\Desktop\\phd\\multivariate_hawkes\\data\\trained_params\\moving_average\\'
+            + pair
+            + f'\\window_duration_seconds_{window_duration_second}\\'
+        )
+
         os.makedirs(params_path, exist_ok=True)
 
-        training_time_in_minutes = training_time // 60
-
         df = pd.read_csv(
-            f'C:\\Users\\Admin\\Desktop\\phd\\hawkes_coe\\hawkes\\data_{pair}\\hawkes_best_decays\\hawkes_decay_{training_time_in_minutes}min.tsv',
+            f'C:\\Users\\Admin\\Desktop\\phd\\hawkes_coe\\hawkes\\data_{pair}\\hawkes_best_decays\\hawkes_decay_10min.tsv',
             sep='\t'
         )
 
@@ -23,9 +26,6 @@ for pair in pairs:
         for index, row in df.iterrows():
             timestamp = int(row['timestamp'])
             timestamp_sim = int(row['timestamp_density'])
-            alpha = row['alpha']
-            decay = row['decay']
-            baseline = row['baseline']
             
             # Find the corresponding file with the timestamp
             # Check both the normal and interrupted version
@@ -42,18 +42,11 @@ for pair in pairs:
                 continue  # Skip this row if no corresponding file is found
             
             # Create the three new files with suffixes _alpha, _beta, and _mu
-            alpha_file = os.path.join(params_path, f'{base_file_name}_{timestamp_sim}_alpha.txt')
-            beta_file = os.path.join(params_path, f'{base_file_name}_{timestamp_sim}_beta.txt')
-            mu_file = os.path.join(params_path, f'{base_file_name}_{timestamp_sim}_mu.txt')
+            param_file = os.path.join(params_path, f'{base_file_name}_{timestamp_sim}_window_duration_seconds.txt')
             
             # Write the corresponding values to each file
-            with open(alpha_file, 'w') as f_alpha:
-                f_alpha.write(str(alpha))
+            with open(param_file, 'w') as f_alpha:
+                f_alpha.write(str(window_duration_second))
             
-            with open(beta_file, 'w') as f_beta:
-                f_beta.write(str(decay))
-            
-            with open(mu_file, 'w') as f_mu:
-                f_mu.write(str(baseline))
-
         print("Files created successfully.")
+    print(f"Files for {pair} created successfully.")

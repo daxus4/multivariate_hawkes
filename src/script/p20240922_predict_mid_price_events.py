@@ -148,64 +148,73 @@ if __name__ == "__main__":
                     for event_type_times_map in event_type_times_maps
                 ]
 
-                time_prediction_model_factory = TimePredictionModelFactory(
+                simulated_params_dir = os.path.join(
+                    CONST.TRAINED_PARAMS_FOLDER,
                     run_info.model_name,
-                    30,
-                    os.path.join(
-                        CONST.TRAINED_PARAMS_FOLDER,
+                    testing_conf.pair,
+                )
+
+                simulated_params_subdirs = [
+                    d for d in os.listdir(simulated_params_dir)
+                    if os.path.isdir(os.path.join(simulated_params_dir, d))
+                ]
+
+                for simulated_params_subdir in simulated_params_subdirs:
+                    time_prediction_model_factory = TimePredictionModelFactory(
+                        run_info.model_name,
+                        30,
+                        simulated_params_subdir,
+                        loading_info.start_registration_time,
+                        start_simulation_time,
+                    )
+
+                    time_prediction_model = time_prediction_model_factory.get_model()
+
+                    period_for_simulation = PeriodForSimulation(
+                        event_type_event_times_map=event_type_times_maps_formatted_in_seconds[0],
+                        event_types_to_predict=['MID_PRICE_CHANGE'],
+                        event_types_order=events_conf.events_to_compute
+                    )
+
+                    time_prediction_tester = EveryTimePredictionTester(
+                        time_prediction_model,
+                        period_for_simulation,
+                        testing_conf.seconds_warm_up_period,
+                    )
+
+                    event_type_predicted_events_map = time_prediction_tester.get_predicted_event_times()
+                    event_type_real_events_map = time_prediction_tester.get_event_type_real_event_times_map()
+
+                    predicted_array = event_type_predicted_events_map['MID_PRICE_CHANGE']
+                    real_array = event_type_real_events_map['MID_PRICE_CHANGE']
+
+                    df = pd.DataFrame({
+                        'real': real_array,
+                        'predicted': predicted_array
+                    })
+
+                    simulations_dir = os.path.join(
+                        CONST.SIMULATIONS_FOLDER,
                         run_info.model_name,
                         testing_conf.pair,
-                    ),
-                    loading_info.start_registration_time,
-                    start_simulation_time,
-                )
+                        os.path.basename(os.path.normpath(simulated_params_subdir))
 
-                time_prediction_model = time_prediction_model_factory.get_model()
+                    )
 
-                period_for_simulation = PeriodForSimulation(
-                    event_type_event_times_map=event_type_times_maps_formatted_in_seconds[0],
-                    event_types_to_predict=['MID_PRICE_CHANGE'],
-                    event_types_order=events_conf.events_to_compute
-                )
+                    if not os.path.exists(simulations_dir):
+                        os.makedirs(simulations_dir)
 
-                time_prediction_tester = EveryTimePredictionTester(
-                    time_prediction_model,
-                    period_for_simulation,
-                    testing_conf.seconds_warm_up_period,
-                )
+                    prefix = os.path.basename(loading_info.path)
+                    prefix = os.path.splitext(prefix)[0]
+                    prefix = os.path.join(
+                        simulations_dir,
+                        prefix
+                    )
 
-                event_type_predicted_events_map = time_prediction_tester.get_predicted_event_times()
-                event_type_real_events_map = time_prediction_tester.get_event_type_real_event_times_map()
-
-                predicted_array = event_type_predicted_events_map['MID_PRICE_CHANGE']
-                real_array = event_type_real_events_map['MID_PRICE_CHANGE']
-
-                df = pd.DataFrame({
-                    'real': real_array,
-                    'predicted': predicted_array
-                })
-
-                simulations_dir = os.path.join(
-                    CONST.SIMULATIONS_FOLDER,
-                    run_info.model_name,
-                    testing_conf.pair
-                )
-
-                if not os.path.exists(simulations_dir):
-                    os.makedirs(simulations_dir)
-
-                prefix = os.path.basename(loading_info.path)
-                prefix = os.path.splitext(prefix)[0]
-                prefix = os.path.join(
-                    simulations_dir,
-                    prefix
-                )
-
-                df.to_csv(
-                    os.path.join(
-                        f'{prefix}_{start_simulation_time}.tsv'
-                    ),
-                    index=False,
-                    sep='\t'
-                )
-
+                    df.to_csv(
+                        os.path.join(
+                            f'{prefix}_{start_simulation_time}.tsv'
+                        ),
+                        index=False,
+                        sep='\t'
+                    )

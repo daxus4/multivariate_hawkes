@@ -1,2 +1,2 @@
-pair: "ETH_BTC"
-seconds_in_a_period: 600
+pair: "ETH_USDT"
+seconds_in_a_period: [300, 900]
