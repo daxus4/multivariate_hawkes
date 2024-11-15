@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 @dataclass
 class TrainingConf:
     pair: str
-    seconds_in_a_period: int
+    seconds_in_a_period: List[int]
 
     @classmethod
     def from_dict(cls, conf: Dict[str, Any]) -> "TrainingConf":

@@ -155,7 +155,8 @@ if __name__ == "__main__":
                 )
 
                 simulated_params_subdirs = [
-                    d for d in os.listdir(simulated_params_dir)
+                    os.path.join(simulated_params_dir, d)
+                    for d in os.listdir(simulated_params_dir)
                     if os.path.isdir(os.path.join(simulated_params_dir, d))
                 ]
 
