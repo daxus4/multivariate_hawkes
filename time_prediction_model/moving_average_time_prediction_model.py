@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -7,6 +7,14 @@ from time_prediction_model.time_prediction_model import TimePredictionModel
 
 
 class MovingAverageTimePredictionModel(TimePredictionModel):
+    #def __init__(
+    #    self,
+    #    params: Dict[str, Any],
+    #    prediction_period_duration: float,
+    #) -> None:
+    #    super().__init__(params)
+    #    self._prediction_period_duration = prediction_period_duration
+
     def predict_next_event_time_from_current_time(
         self,
         period_for_simulation: PeriodForSimulation,
@@ -18,7 +26,7 @@ class MovingAverageTimePredictionModel(TimePredictionModel):
 
         next_event_times = {
             event_type: [self._get_predicted_event_after_current_time(
-                event_times[-1], current_time, self._parameters["window_duration_seconds"]
+                event_times, current_time, self._parameters["window_duration_seconds"]
             )]
             for event_type, event_times in event_type_event_times_map_to_predict.items()
         }

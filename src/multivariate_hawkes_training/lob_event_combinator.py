@@ -63,7 +63,6 @@ class LOBEventCombinator:
             if key in event_type_times_map
         ]
         combined_array = np.concatenate(arrays)
-
-        sorted_array = np.sort(combined_array)
+        sorted_array = np.unique(np.sort(combined_array))
 
         return sorted_array

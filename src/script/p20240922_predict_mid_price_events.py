@@ -198,8 +198,8 @@ if __name__ == "__main__":
                         CONST.SIMULATIONS_FOLDER,
                         run_info.model_name,
                         testing_conf.pair,
-                        os.path.basename(os.path.normpath(simulated_params_subdir))
-
+                        os.path.basename(os.path.normpath(simulated_params_subdir)),
+                        f"simulation_seconds_{testing_conf.seconds_simulation_period}"
                     )
 
                     if not os.path.exists(simulations_dir):

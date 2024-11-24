@@ -33,10 +33,28 @@ class EveryTimePredictionTester(TimePredictionTester):
 
         return period_for_simulation_from_warmup.get_event_type_event_times_map_to_predict()
 
+    def _get_shifted_event_type_real_event_times_map(self) -> Dict[str, np.ndarray]:
+        period_for_simulation_to_predict = (
+            self._period_for_simulation.get_event_type_event_times_map_to_predict()
+        )
+
+        real_event_type, real_event_times = next(
+            iter(period_for_simulation_to_predict.items())
+        )
+
+        index = np.searchsorted(
+            real_event_times, self._warmup_time_duration, side="left"
+        ) - 1
+        result = real_event_times[index:-1]
+
+        return {
+            real_event_type: result
+        }
+
     def get_predicted_event_times(self) -> Dict[str, np.ndarray]:
         event_type_predicted_event_times_map = self._get_empty_event_type_predicted_event_times_map()
         
-        for event_type, real_event_times in self._event_type_real_event_times_map.items():
+        for event_type, real_event_times in self._get_shifted_event_type_real_event_times_map().items():
             for i, event_time in enumerate(real_event_times):
                 predicted_event_times = self._get_next_predicted_event_time_from_current_time(
                     event_time
