@@ -157,10 +157,11 @@ if __name__ == "__main__":
                 simulated_params_subdirs = [
                     os.path.join(simulated_params_dir, d)
                     for d in os.listdir(simulated_params_dir)
-                    if os.path.isdir(os.path.join(simulated_params_dir, d))
+                    if os.path.isdir(os.path.join(simulated_params_dir, d)) and "lshade" in d
                 ]
 
                 for simulated_params_subdir in simulated_params_subdirs:
+                    print(simulated_params_subdir)
                     time_prediction_model_factory = TimePredictionModelFactory(
                         run_info.model_name,
                         30,

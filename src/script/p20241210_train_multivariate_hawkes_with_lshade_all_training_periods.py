@@ -7,9 +7,6 @@ import yaml
 
 import src.constants as CONST
 from src.conf.events_conf.events_conf import EventsConf
-from src.conf.training.model.multivariate_hawkes_training_conf import (
-    MultivariateHawkesTrainingConf,
-)
 from src.conf.training.training_conf import TrainingConf
 from src.events_extractor.multivariate_lob_events_extractor import (
     MultivariateLOBEventsExtractor,
@@ -21,13 +18,22 @@ from src.multivariate_hawkes_training.event_type_times_maps_formatter import (
     EventTypeTimesMapsFormatter,
 )
 from src.multivariate_hawkes_training.lob_event_combinator import LOBEventCombinator
-from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_greedy_beta_search import (
-    MultivariateHawkesTrainerWithGreedyBetaSearch,
+from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_lshade import (
+    MultivariateHawkesTrainerWithLShade,
 )
+
+lower_boundary = 0.01
+upper_boundary = 100
+initial_population_size = 1000
+max_generations = 100
+memory_size = 50
+p = 0.2
+max_number_fitness_evaluations = 8000
+seed = 444
+
 
 CONF_EVENTS_FILENAME = "mid_price_change_and_sublevels_events_conf.yml"
 CONF_TRAINING_FILENAME = "training_conf.yml"
-CONF_MULTIVARIATE_HAWKES_TRAINING_FILENAME = "multivariate_hawkes_training_conf.yml"
 
 def get_conf(path: str) -> Dict:
     with open(path, 'r') as f:
@@ -61,16 +67,6 @@ def get_event_type_times_maps_filtered(
     ]
 
 if __name__ == "__main__":
-    multivariate_hawkes_training_conf_map = get_conf(
-        os.path.join(
-            CONST.CONF_TRAINING_MODEL_FOLDER,
-            CONF_MULTIVARIATE_HAWKES_TRAINING_FILENAME
-        )
-    )
-    multivariate_hawkes_training_conf = MultivariateHawkesTrainingConf.from_dict(
-        multivariate_hawkes_training_conf_map
-    )
-
     training_conf_map = get_conf(
         os.path.join(
             CONST.CONF_TRAINING_FOLDER,
@@ -166,17 +162,23 @@ if __name__ == "__main__":
                     for event_type_times in event_type_times_formatted
                 ]
 
-                trainer = MultivariateHawkesTrainerWithGreedyBetaSearch(
+                trainer = MultivariateHawkesTrainerWithLShade(
                     event_type_times_formatted_in_seconds,
-                    multivariate_hawkes_training_conf.betas_to_train
+                    lower_boundary,
+                    upper_boundary,
+                    initial_population_size,
+                    max_generations,
+                    memory_size,
+                    p,
+                    max_number_fitness_evaluations,
                 )
-                hawkes_kernel = trainer.get_trained_kernel(multivariate_hawkes_training_conf.beta_values_to_test)
+                hawkes_kernel = trainer.get_trained_kernel()
 
                 params_dir = os.path.join(
                     CONST.TRAINED_PARAMS_FOLDER,
                     CONST.MULTIVARIATE_HAWKES,
                     training_conf.pair,
-                    "training_time_" + str(training_time_seconds)
+                    "lshade_training_time_" + str(training_time_seconds)
                 )
 
                 if not os.path.exists(params_dir):
@@ -201,7 +203,7 @@ if __name__ == "__main__":
             CONST.TRAINED_PARAMS_FOLDER,
             CONST.MULTIVARIATE_HAWKES,
             training_conf.pair,
-            "training_time_" + str(training_time_seconds)
+            "lshade_training_time_" + str(training_time_seconds)
         )
         with open(
             os.path.join(

@@ -22,6 +22,7 @@ COE_CONF_FILE = "coe_conf.yml"
 BEST_DENSITIES_FILE = 'best_densities_full.csv'
 ORDERBOOK_CHANGES_FILE_PREFIX = 'orderbook_changes_'
 ORDER_OF_EVENT_TYPES_FILE = 'order_of_event_type.txt'
+LIKELIHOODS_FILE = 'likelihoods.txt'
 
 # ALGORITHMS
 MULTIVARIATE_HAWKES = 'multivariate_hawkes'
