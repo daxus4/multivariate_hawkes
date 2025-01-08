@@ -4,6 +4,66 @@ import numpy as np
 from scipy.stats import cauchy
 
 
+def get_initial_random_population(
+    gene_upper_boundaries: np.ndarray,
+    initial_population_size: int,
+    event_counts_for_type: np.ndarray,
+    training_time_in_seconds: int,
+) -> np.ndarray:
+    """
+    Returns a NxD array of random individuals, where N is the initial population size
+    and D is the problem dimensionality. Supposing that the number of event types is
+    2, D is formed by 2 mu, 4 rho (2x2 matrix) and 4 beta (2x2 matrix) parameters.
+    """
+    type_count = len(event_counts_for_type)
+    square_matrix_size = type_count * type_count
+    parameters_count = 2 * square_matrix_size + type_count
+
+    initial_population = np.zeros((initial_population_size, parameters_count))
+
+    # fill the initial population with random mu values
+    for i in range(type_count):
+        current_mu_max_value = 0.2*event_counts_for_type[i]/training_time_in_seconds
+        initial_population[:, i] = np.random.uniform(
+            0, min(gene_upper_boundaries[i], current_mu_max_value), initial_population_size
+        )
+
+    # fill the initial population with random rho values
+    for i,j in [(i,j) for i in range(type_count) for j in range(type_count)]:
+        current_rho_max_value = min(
+            0.2*event_counts_for_type[i]/event_counts_for_type[j],
+            0.5
+        )
+
+        initial_population[:, type_count + i*type_count + j] = np.random.uniform(
+            0,
+            min(gene_upper_boundaries[type_count + i*type_count + j], current_rho_max_value),
+            initial_population_size
+        )
+    
+    # rescale rho for individual i such that l2 norm of rho_i is less than 1
+    #for i in range(type_count):
+    #    rho_indices = [type_count + i*type_count + j for j in range(type_count)]
+    #    rho_values = initial_population[:, rho_indices]
+    #    rho_norms = np.linalg.norm(rho_values, axis=1)
+    #    rho_values = rho_values / rho_norms[:, np.newaxis]
+
+    #initial_population[:, rho_indices] = rho_values
+    
+    # fill the initial population with random beta values
+    for i,j in [(i,j) for i in range(type_count) for j in range(type_count)]:
+        bernoulli_samples = np.random.binomial(n=1, p=0.5, size=initial_population_size)
+
+        random_values = np.where(
+            bernoulli_samples == 0,
+            np.random.uniform(0, 1, size=initial_population_size),
+            np.random.uniform(0, 100, size=initial_population_size)
+        )
+
+        initial_population[:, type_count + square_matrix_size + i*type_count + j] = random_values
+
+    return initial_population
+
 def weighted_lehmar_mean(succeding_rates, individual_fitnesses, trial_fitnesses):
     improvements = individual_fitnesses - trial_fitnesses
     total_improvement = np.sum(improvements)
@@ -18,13 +78,14 @@ def weighted_lehmar_mean(succeding_rates, individual_fitnesses, trial_fitnesses)
 def lshade(
     fitness: Callable[[np.ndarray], float],
     problem_dimensionality: int,
-    lower_boundary: float,
-    upper_boundary: float,
+    gene_lower_boundaries: np.ndarray,
+    gene_upper_boundaries: np.ndarray,
+    initial_population: np.ndarray,
     initial_population_size: int = 100,
     max_generations: int = 100,
     memory_size: int = 10,
     p: float = 0.2,
-    max_number_fitness_evaluations: int = 1000
+    max_number_fitness_evaluations: int = 1000,
 ) -> Tuple[np.ndarray, float]:
     population_size = initial_population_size
     archive_size = initial_population_size
@@ -36,11 +97,7 @@ def lshade(
     MEMORY_MCR_INDEX = 0
     MEMORY_MMR_INDEX = 1
 
-    previous_gen_population = np.random.uniform(
-        lower_boundary,
-        upper_boundary,
-        size=(initial_population_size, problem_dimensionality)
-    )
+    previous_gen_population = initial_population
 
     crossing_rates = np.zeros(population_size)
     mutation_rates = np.zeros(population_size)
@@ -132,13 +189,13 @@ def lshade(
             )
 
             for gene_index in range(problem_dimensionality):
-                if mutant[gene_index] < lower_boundary:
+                if mutant[gene_index] < gene_lower_boundaries[gene_index]:
                     mutant[gene_index] = (
-                        lower_boundary + current_individual[gene_index]
+                        gene_lower_boundaries[gene_index] + current_individual[gene_index]
                     ) / 2
-                elif mutant[gene_index] > upper_boundary:
+                elif mutant[gene_index] > gene_upper_boundaries[gene_index]:
                     mutant[gene_index] = (
-                        upper_boundary + current_individual[gene_index]
+                        gene_upper_boundaries[gene_index] + current_individual[gene_index]
                     ) / 2
 
             random_gene_index_to_mutate = np.random.randint(0, problem_dimensionality)
