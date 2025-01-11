@@ -6,9 +6,7 @@ import pandas as pd
 
 SIMULATION_TIME_DURATION = pd.Timedelta("2min")
 TRAINING_TIME_DURATION = pd.Timedelta("30min")
-PATH_ORDERBOOK_DIRECTORY = (
-    "C:\\Users\\Admin\\Desktop\\phd\\multivariate_hawkes\\data\\orderbook_changes\\{}\\"
-)
+PATH_ORDERBOOK_DIRECTORY = "C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\orderbook_changes\\{}\\"
 MARKETS = ["BTC_USD", "BTC_USDT", "ETH_BTC", "ETH_USD", "ETH_USDT"]
 
 
@@ -48,7 +46,7 @@ def get_files(directory: str) -> List[str]:
     return [
         f
         for f in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, f)) and f.endswith(".csv")
+        if os.path.isfile(os.path.join(directory, f)) and f.endswith(".tsv")
     ]
 
 
@@ -56,7 +54,6 @@ def save_densities_table(config: Dict, file_path: str):
     df_map = {
         "timestamp": [],
         "timestamp_density": [],
-        "density": [],
     }
 
     for k, v in config.items():
@@ -65,13 +62,9 @@ def save_densities_table(config: Dict, file_path: str):
         df_map["timestamp"].extend([float(timestamp)] * num_densities)
 
         for info_density in v:
-            df_map["timestamp_density"].append(
-                int(pd.Timestamp(info_density[0]).timestamp())
-            )
-            df_map["density"].append(int(info_density[1]))
+            df_map["timestamp_density"].append(info_density)
 
     df_map = pd.DataFrame(df_map)
-    df_map.sort_values(by=["density"], inplace=True, ascending=False)
     df_map["timestamp"] = df_map["timestamp"].apply(lambda x: int(x))
 
     df_map.to_csv(file_path, index=False)
@@ -93,14 +86,14 @@ if __name__ == "__main__":
                 SIMULATION_TIME_DURATION,
                 safety_offset=pd.Timedelta("1s"),
             )
-            df["timestamp"] = df["timestamp"].dt.floor("s")
+            df["Timestamp"] = df["Timestamp"].dt.floor("s")
 
             if not df.empty:
                 # Initialize variables
                 simulation_starts = []
 
-                start_time = df["timestamp"].min()
-                end_time = df["timestamp"].max()
+                start_time = df["Timestamp"].min()
+                end_time = df["Timestamp"].max()
 
                 # create a list of simulation start times starting from start_time with a duration of training_delta + simulation_delta
                 while (
@@ -114,7 +107,8 @@ if __name__ == "__main__":
                     start_time = (
                         start_time + TRAINING_TIME_DURATION + SIMULATION_TIME_DURATION
                     )
-                file_densities_map[orderbook_file_path] = simulation_starts
+                if len(simulation_starts) > 0:
+                    file_densities_map[orderbook_file_path] = simulation_starts
 
         save_densities_table(
             file_densities_map,
