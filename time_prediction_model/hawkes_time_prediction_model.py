@@ -24,13 +24,11 @@ class HawkesTimePredictionModel(TimePredictionModel):
         current_time: float,
     ) -> Dict[str, float]:
         event_times = period_for_simulation.get_ordered_event_times(
-            self._parameters['event_types_order']
+            self._parameters["event_types_order"]
         )
 
         simulated_hawkes = self._get_hawkes_simulation(
-            event_times,
-            current_time,
-            self._seed
+            event_times, current_time, self._seed
         )
 
         predicted_timestamps = self._get_new_simulated_timestamps(
@@ -40,7 +38,7 @@ class HawkesTimePredictionModel(TimePredictionModel):
 
         return {
             event_type: predicted_timestamps[i]
-            for i, event_type in enumerate(self._parameters['event_types_order'])
+            for i, event_type in enumerate(self._parameters["event_types_order"])
         }
 
     def _get_hawkes_simulation(
@@ -55,7 +53,7 @@ class HawkesTimePredictionModel(TimePredictionModel):
             baseline=self._get_mu_converted_for_simulation(),
             end_time=current_time,
             seed=seed,
-            verbose=False, 
+            verbose=False,
         )
         sim_hawkes.track_intensity(1)
 
@@ -86,10 +84,10 @@ class HawkesTimePredictionModel(TimePredictionModel):
         return new_simulated_timestamps
 
     def _get_alpha_converted_for_simulation(self) -> np.ndarray:
-        return self._parameters['alpha']
-    
+        return self._parameters["alpha"]
+
     def _get_beta_converted_for_simulation(self) -> np.ndarray:
-        return self._parameters['beta']
-    
+        return self._parameters["beta"]
+
     def _get_mu_converted_for_simulation(self) -> float:
-        return self._parameters['mu']
+        return self._parameters["mu"]

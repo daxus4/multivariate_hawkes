@@ -5,9 +5,9 @@ from numba.typed import List
 
 @njit
 def negative_exponential_effect(
-    beta_mn: float, end_time: float, times_n: np.ndarray
+    alpha_mn: float, beta_mn: float, end_time: float, times_n: np.ndarray
 ) -> float:
-    return np.sum(1 - np.exp(-beta_mn * (end_time - times_n)))
+    return (alpha_mn / beta_mn) * np.sum(1 - np.exp(-beta_mn * (end_time - times_n)))
 
 
 @njit
@@ -15,17 +15,17 @@ def loglikelihood_negative_exponential_contribution(
     alphas_mn: np.ndarray,
     betas_mn: np.ndarray,
     end_time: float,
-    events_times: List[np.ndarray],
+    events_times: np.ndarray,
 ) -> float:
     num_events = len(events_times)
     negative_exponential_effects = np.empty(num_events, dtype=np.float64)
 
     for n in range(num_events):
         negative_exponential_effects[n] = negative_exponential_effect(
-            betas_mn[n], end_time, events_times[n]
+            alphas_mn[n], betas_mn[n], end_time, events_times[n]
         )
 
-    return np.sum(alphas_mn / betas_mn * negative_exponential_effects)
+    return np.sum(negative_exponential_effects)
 
 
 @njit
@@ -137,7 +137,7 @@ def loglikelihood(
     for n in range(num_events):
         negative_exponential_contributions[n] = (
             loglikelihood_negative_exponential_contribution(
-                alphas[n], betas[n], end_time, events_times[n]
+                alphas[n], betas[n], end_time, events_times
             )
         )
 
@@ -156,10 +156,8 @@ def loglikelihood(
 
 
 @njit
-def l1_penalty(
-    alphas: np.ndarray, betas: np.ndarray, regularization_param: float
-) -> float:
-    return regularization_param * (np.sum(np.abs(alphas)) + np.sum(np.abs(betas)))
+def l1_penalty(rhos: np.ndarray, regularization_param: float) -> float:
+    return regularization_param * (np.sum(np.abs(rhos)))
 
 
 @njit
@@ -176,15 +174,16 @@ def likelihood_fitness_to_minimize(
     mu: np.ndarray,
     alphas: np.ndarray,
     betas: np.ndarray,
-    rhos: np.ndarray,
     end_time: float,
     events_times: List[np.ndarray],
     regularization_param: float,
     instability_param: float,
 ) -> float:
+    rhos = alphas / betas
+
     return (
         -loglikelihood(mu, alphas, betas, end_time, events_times)
-        + l1_penalty(alphas, betas, regularization_param)
+        + l1_penalty(rhos, regularization_param)
         + instability_penalty(rhos, instability_param)
     )
 
@@ -200,15 +199,19 @@ def get_likelihood_fitness_from_individual(
     num_event_types = len(events_times)
 
     mu = individual[:num_event_types]
-    alphas = individual[num_event_types : 2 * num_event_types]
-    betas = individual[2 * num_event_types : 3 * num_event_types]
-    rhos = alphas / betas
+
+    alphas = individual[
+        num_event_types : num_event_types + num_event_types * num_event_types
+    ].reshape(num_event_types, num_event_types)
+
+    betas = individual[num_event_types + num_event_types * num_event_types :].reshape(
+        num_event_types, num_event_types
+    )
 
     return likelihood_fitness_to_minimize(
         mu,
         alphas,
         betas,
-        rhos,
         end_time,
         events_times,
         regularization_param,

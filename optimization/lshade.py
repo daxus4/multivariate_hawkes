@@ -1,9 +1,12 @@
-from typing import Callable, Tuple
+from typing import Tuple
 
 import numpy as np
-from scipy.stats import cauchy
+from numba import njit
+
+from optimization.hawkes_likelihood import get_likelihood_fitness_from_individual
 
 
+@njit
 def get_initial_random_population(
     gene_upper_boundaries: np.ndarray,
     initial_population_size: int,
@@ -77,6 +80,7 @@ def get_initial_random_population(
     return initial_population
 
 
+@njit
 def weighted_lehmar_mean(succeding_rates, individual_fitnesses, trial_fitnesses):
     improvements = individual_fitnesses - trial_fitnesses
     total_improvement = np.sum(improvements)
@@ -89,8 +93,9 @@ def weighted_lehmar_mean(succeding_rates, individual_fitnesses, trial_fitnesses)
     return lehmar_mean
 
 
+"""
 def lshade(
-    fitness: Callable[[np.ndarray], float],
+    fitness: Callable[..., float],
     problem_dimensionality: int,
     gene_lower_boundaries: np.ndarray,
     gene_upper_boundaries: np.ndarray,
@@ -100,8 +105,70 @@ def lshade(
     p: float = 0.2,
     max_number_fitness_evaluations: int = 1000,
 ) -> Tuple[np.ndarray, float]:
+"""
+
+
+@njit
+def get_sample_from_cauchy(location: float, scale: float) -> float:
+    quantile = np.random.rand()
+    random_number = location + scale * np.tan(np.pi * quantile - np.pi / 2.0)
+    return random_number
+
+
+@njit
+def get_clipped_number(number: float, lower_bound: float, upper_bound: float) -> float:
+    if number < lower_bound:
+        return lower_bound
+    elif number > upper_bound:
+        return upper_bound
+    else:
+        return number
+
+
+@njit
+def setdiff1d(array1, elem):
+    # Create a boolean mask for elements in array1 that are not in array2
+    result_mask = np.ones(array1.shape[0], dtype=np.bool_)
+    for i in range(array1.shape[0]):
+        if array1[i] == elem:
+            result_mask[i] = False
+
+    return array1[result_mask]
+
+
+@njit
+def remove_rows(array, rows_to_remove):
+    # Sort the indices to remove (optional but recommended for consistency)
+    rows_to_remove = np.sort(rows_to_remove)
+
+    # Create a boolean mask with True for all rows initially
+    mask = np.ones(array.shape[0], dtype=np.bool_)
+
+    # Set the rows to be removed to False in the mask
+    mask[rows_to_remove] = False
+
+    # Return the array with rows where mask is True
+    return array[mask]
+
+
+@njit
+def lshade(
+    gene_lower_boundaries,
+    gene_upper_boundaries,
+    initial_population,
+    max_generations,
+    memory_size,
+    p,
+    max_number_fitness_evaluations,
+    end_time,
+    events_times,
+    regularization_param,
+    instability_param,
+) -> np.ndarray:
+
     population_size = initial_population.shape[0]
     archive_size = initial_population.shape[0]
+    problem_dimensionality = initial_population.shape[1]
     archive = np.zeros((archive_size, problem_dimensionality))
     archive_fitnesses = np.empty(archive_size)
     archive_fitnesses.fill(np.nan)
@@ -110,14 +177,23 @@ def lshade(
     MEMORY_MCR_INDEX = 0
     MEMORY_MMR_INDEX = 1
 
-    previous_gen_population = initial_population
+    previous_gen_population = initial_population.copy()
 
     crossing_rates = np.zeros(population_size)
     mutation_rates = np.zeros(population_size)
 
-    previous_gen_individuals_fitnesses = np.array(
-        [fitness(individual) for individual in previous_gen_population]
-    )
+    previous_gen_individuals_fitnesses = np.empty(population_size)
+    for individual_index in range(population_size):
+        previous_gen_individuals_fitnesses[individual_index] = (
+            get_likelihood_fitness_from_individual(
+                previous_gen_population[individual_index],
+                end_time,
+                events_times,
+                regularization_param,
+                instability_param,
+            )
+        )
+
     current_number_of_fitness_evaluations = population_size
     memory_index_to_update = 0
 
@@ -133,6 +209,7 @@ def lshade(
     while (generation_number <= max_generations) and (
         current_number_of_fitness_evaluations < max_number_fitness_evaluations
     ):
+        print(f"Generation number: {generation_number}")
 
         succeding_crossover_rates = np.empty(population_size)
         succeding_crossover_rates.fill(np.nan)
@@ -152,17 +229,20 @@ def lshade(
             if np.isnan(memory[memory_index, MEMORY_MCR_INDEX]):
                 crossing_rates[individual_index] = 0
             else:
-                crossing_rates[individual_index] = np.clip(
+                crossing_rates[individual_index] = get_clipped_number(
                     np.random.normal(memory[memory_index, MEMORY_MCR_INDEX], 0.1),
-                    0,
+                    0.0,
                     1.0,
                 )
 
             generated_mutation_rate = 0
             while generated_mutation_rate <= 0:
-                generated_mutation_rate = np.clip(
-                    cauchy.rvs(memory[memory_index, MEMORY_MMR_INDEX], 0.1), None, 1.0
+                generated_mutation_rate = get_sample_from_cauchy(
+                    memory[memory_index, MEMORY_MMR_INDEX], 0.1
                 )
+                if generated_mutation_rate > 1:
+                    generated_mutation_rate = 1
+
             mutation_rates[individual_index] = generated_mutation_rate
 
             number_of_best_individuals = round(population_size * p)
@@ -179,11 +259,11 @@ def lshade(
             ]
 
             number_individuals_in_archive = np.sum(~np.isnan(archive_fitnesses))
-            individual_indices_not_current = [
-                index
-                for index in range(population_size + number_individuals_in_archive)
-                if index != individual_index
-            ]
+            individual_indices_not_current = setdiff1d(
+                np.arange(population_size + number_individuals_in_archive),
+                individual_index,
+            )
+
             random_individual_indices = np.random.choice(
                 individual_indices_not_current, 2, replace=False
             )
@@ -231,7 +311,13 @@ def lshade(
                 crossover_gene_index, mutant, current_individual
             )
             trail_individuals[individual_index] = trail_individual
-            trial_fitnesses[individual_index] = fitness(trail_individual)
+            trial_fitnesses[individual_index] = get_likelihood_fitness_from_individual(
+                trail_individual,
+                end_time,
+                events_times,
+                regularization_param,
+                instability_param,
+            )
             current_number_of_fitness_evaluations = (
                 current_number_of_fitness_evaluations + 1
             )
@@ -318,11 +404,11 @@ def lshade(
 
         next_gen_population_size = round(
             (
-                (min_number_of_individuals - initial_population_size)
+                (min_number_of_individuals - initial_population.shape[0])
                 / max_number_fitness_evaluations
             )
             * current_number_of_fitness_evaluations
-            + initial_population_size
+            + initial_population.shape[0]
         )
 
         if next_gen_population_size < population_size:
@@ -337,8 +423,8 @@ def lshade(
                     next_gen_individuals_fitnesses, -number_of_individuals_to_delete
                 )[:number_of_individuals_to_delete]
 
-                next_gen_individuals = np.delete(
-                    next_gen_individuals, worst_individuals_indices, axis=0
+                next_gen_individuals = remove_rows(
+                    next_gen_individuals, worst_individuals_indices
                 )
                 next_gen_individuals_fitnesses = np.delete(
                     next_gen_individuals_fitnesses, worst_individuals_indices
@@ -349,4 +435,5 @@ def lshade(
         previous_gen_individuals_fitnesses = next_gen_individuals_fitnesses
         generation_number = generation_number + 1
 
-    return global_best_individual, global_best_individual_fitness
+    print(f"Global best individual fitness: {global_best_individual_fitness}")
+    return global_best_individual
