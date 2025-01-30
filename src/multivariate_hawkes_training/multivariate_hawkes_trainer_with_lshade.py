@@ -5,7 +5,7 @@ import numpy as np
 from numba.typed import List as NumbaList
 
 from optimization.hawkes_likelihood import get_likelihood_fitness_from_individual
-from optimization.lshade import get_initial_random_population, lshade
+from optimization.lshade import get_initial_random_population, lshade, lshade_save_info
 
 
 @dataclass
@@ -63,7 +63,7 @@ class MultivariateHawkesTrainerWithLShade:
 
         return TrainedHawkesKernel(mu, alphas, betas, fitness)
 
-    def get_trained_kernel(self) -> TrainedHawkesKernel:
+    def get_trained_kernel(self, logs_folder) -> TrainedHawkesKernel:
         initial_population = get_initial_random_population(
             self._gene_upper_boundaries,
             self._initial_population_size,

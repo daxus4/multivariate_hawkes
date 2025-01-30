@@ -15,6 +15,7 @@ class HawkesTimePredictionModel(TimePredictionModel):
         seed: int = 1039,
     ) -> None:
         super().__init__(params)
+        self._parameters["alpha"] = self._parameters["alpha"] / self._parameters["beta"]
         self._prediction_period_duration = prediction_period_duration
         self._seed = seed
 

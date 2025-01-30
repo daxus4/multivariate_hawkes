@@ -162,6 +162,7 @@ if __name__ == "__main__":
                     os.path.join(simulated_params_dir, d)
                     for d in os.listdir(simulated_params_dir)
                     if os.path.isdir(os.path.join(simulated_params_dir, d))
+                    and "lshade_logged_training" in d
                 ]
 
                 for simulated_params_subdir in simulated_params_subdirs:

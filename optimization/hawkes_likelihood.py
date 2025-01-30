@@ -7,6 +7,9 @@ from numba.typed import List
 def negative_exponential_effect(
     alpha_mn: float, beta_mn: float, end_time: float, times_n: np.ndarray
 ) -> float:
+    if len(times_n) == 0:
+        return 0
+
     return (alpha_mn / beta_mn) * np.sum(1 - np.exp(-beta_mn * (end_time - times_n)))
 
 
@@ -36,8 +39,15 @@ def r_mn(
     previous_r_mn: float,
     intermediate_t_n_values: np.ndarray,
 ) -> float:
-    return np.exp(-beta_mn * (current_t_m - previous_t_m)) * previous_r_mn + np.sum(
-        np.exp(-beta_mn * (current_t_m - intermediate_t_n_values))
+    summatory_other_type = 0
+    if len(intermediate_t_n_values) > 0:
+        summatory_other_type = np.sum(
+            np.exp(-beta_mn * (current_t_m - intermediate_t_n_values))
+        )
+
+    return (
+        np.exp(-beta_mn * (current_t_m - previous_t_m)) * previous_r_mn
+        + summatory_other_type
     )
 
 
@@ -65,7 +75,7 @@ def loglikelihood_m(
     dt_integral = -mu_m * end_time - negative_exponential_contribution
 
     recursive_part_effects = np.zeros(num_events, dtype=np.float64)
-    end_indices_times_events = np.zeros(num_events, dtype=np.float64)
+    end_indices_times_events = np.zeros(num_events, dtype=np.int64)
 
     for n in range(num_events):
         end_indices_times_events[n] = np.searchsorted(
@@ -156,30 +166,36 @@ def loglikelihood(
 
 
 @njit
-def l1_penalty(rhos: np.ndarray, regularization_param: float) -> float:
-    return regularization_param * (np.sum(np.abs(rhos)))
+def l1_penalty(alphas: np.ndarray, regularization_param: float) -> float:
+    return regularization_param * (np.sum(np.abs(alphas)))
 
 
 @njit
 def instability_penalty(rhos: np.ndarray, instability_param: float) -> float:
-    kernel_spectral_norm = np.linalg.norm(rhos, ord=2)
-    if kernel_spectral_norm > 1:
-        return instability_param * kernel_spectral_norm
+    kernel_spectral_radius = get_spectral_radius(rhos)
+    if kernel_spectral_radius > 1:
+        return instability_param * kernel_spectral_radius
     else:
         return 0
 
 
 @njit
+def get_spectral_radius(matrix: np.ndarray) -> float:
+    eigenvalues = np.linalg.eigvals(matrix.astype(np.complex128))
+    return np.max(np.abs(eigenvalues))
+
+
+@njit
 def likelihood_fitness_to_minimize(
     mu: np.ndarray,
-    alphas: np.ndarray,
+    rhos: np.ndarray,
     betas: np.ndarray,
     end_time: float,
     events_times: List[np.ndarray],
     regularization_param: float,
     instability_param: float,
 ) -> float:
-    rhos = alphas / betas
+    alphas = rhos * betas
 
     return (
         -loglikelihood(mu, alphas, betas, end_time, events_times)
@@ -200,7 +216,7 @@ def get_likelihood_fitness_from_individual(
 
     mu = individual[:num_event_types]
 
-    alphas = individual[
+    rhos = individual[
         num_event_types : num_event_types + num_event_types * num_event_types
     ].reshape(num_event_types, num_event_types)
 
@@ -210,7 +226,7 @@ def get_likelihood_fitness_from_individual(
 
     return likelihood_fitness_to_minimize(
         mu,
-        alphas,
+        rhos,
         betas,
         end_time,
         events_times,

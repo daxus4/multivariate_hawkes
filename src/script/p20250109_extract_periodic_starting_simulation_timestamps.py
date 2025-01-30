@@ -1,6 +1,5 @@
-import json
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import pandas as pd
 
@@ -105,14 +104,14 @@ if __name__ == "__main__":
                     )
                     simulation_starts.append(start_simulation_timestamp)
                     start_time = (
-                        start_time + TRAINING_TIME_DURATION + SIMULATION_TIME_DURATION
+                        start_time + SIMULATION_TIME_DURATION + pd.Timedelta(seconds=1)
                     )
                 if len(simulation_starts) > 0:
                     file_densities_map[orderbook_file_path] = simulation_starts
 
         save_densities_table(
             file_densities_map,
-            os.path.join(path_orderbook_directory, "start_simulations.csv"),
+            os.path.join(path_orderbook_directory, "start_simulations_sequential.csv"),
         )
 
         # save file_densities_map in json

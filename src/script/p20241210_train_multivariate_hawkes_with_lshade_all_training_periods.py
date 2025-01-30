@@ -22,15 +22,15 @@ from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_lshade im
     MultivariateHawkesTrainerWithLShade,
 )
 
-gene_lower_boundaries = np.array([0.001] * (3 + 9 + 9))
-gene_upper_boundaries = np.array([10] * 3 + [10] * 9 + [101] * 9)
-initial_population_size = 1000
-max_generations = 100
+gene_lower_boundaries = np.array([0.0] * (3 + 9 + 9))
+gene_upper_boundaries = np.array([1.2] * 3 + [1] * 9 + [101] * 9)
+initial_population_size = 7000
+max_generations = 250
 memory_size = 70
-p = 0.2
-max_number_fitness_evaluations = 100_000
-regularization_param = 0.01
-instability_param = 100
+p = 0.33
+max_number_fitness_evaluations = 300_000
+regularization_param = 50
+instability_param = 100_000
 seed = 444
 
 
@@ -171,8 +171,6 @@ if __name__ == "__main__":
                     instability_param,
                     training_time_seconds,
                 )
-                hawkes_kernel = trainer.get_trained_kernel()
-
                 params_dir = os.path.join(
                     CONST.TRAINED_PARAMS_FOLDER,
                     CONST.MULTIVARIATE_HAWKES,
@@ -186,6 +184,12 @@ if __name__ == "__main__":
                 prefix = os.path.basename(loading_info.path)
                 prefix = os.path.splitext(prefix)[0]
                 prefix = os.path.join(params_dir, prefix)
+
+                logs_dir = f"{prefix}_{start_simulation_time}_logs"
+                if not os.path.exists(logs_dir):
+                    os.makedirs(logs_dir, exist_ok=True)
+
+                hawkes_kernel = trainer.get_trained_kernel(logs_dir)
 
                 training_time_file_likelihood_map[training_time_seconds]["file"].append(
                     f"{prefix}_{start_simulation_time}"
