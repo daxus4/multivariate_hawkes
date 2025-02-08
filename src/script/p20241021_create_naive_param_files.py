@@ -36,6 +36,7 @@ for pair in pairs:
     df = df.merge(
         start_simulation_df, on=["timestamp", "timestamp_density"], how="inner"
     )
+    print(len(df.index))
 
     # Loop through each row in the dataframe
     for index, row in df.iterrows():

@@ -186,8 +186,8 @@ if __name__ == "__main__":
                 prefix = os.path.join(params_dir, prefix)
 
                 logs_dir = f"{prefix}_{start_simulation_time}_logs"
-                if not os.path.exists(logs_dir):
-                    os.makedirs(logs_dir, exist_ok=True)
+                # if not os.path.exists(logs_dir):
+                #    os.makedirs(logs_dir, exist_ok=True)
 
                 hawkes_kernel = trainer.get_trained_kernel(logs_dir)
 
@@ -200,7 +200,7 @@ if __name__ == "__main__":
 
                 np.savetxt(f"{prefix}_{start_simulation_time}_mu.txt", hawkes_kernel.mu)
                 np.savetxt(
-                    f"{prefix}_{start_simulation_time}_alpha.txt", hawkes_kernel.alphas
+                    f"{prefix}_{start_simulation_time}_rho.txt", hawkes_kernel.rhos
                 )
                 np.savetxt(
                     f"{prefix}_{start_simulation_time}_beta.txt", hawkes_kernel.betas

@@ -15,7 +15,7 @@ class HawkesTimePredictionModel(TimePredictionModel):
         seed: int = 1039,
     ) -> None:
         super().__init__(params)
-        self._parameters["alpha"] = self._parameters["alpha"] / self._parameters["beta"]
+        # self._parameters["alpha"] = self._parameters["alpha"] / self._parameters["beta"]
         self._prediction_period_duration = prediction_period_duration
         self._seed = seed
 
@@ -49,7 +49,7 @@ class HawkesTimePredictionModel(TimePredictionModel):
         seed: int,
     ) -> hk.SimuHawkesExpKernels:
         sim_hawkes = hk.SimuHawkesExpKernels(
-            adjacency=self._get_alpha_converted_for_simulation(),
+            adjacency=self._get_rho_converted_for_simulation(),
             decays=self._get_beta_converted_for_simulation(),
             baseline=self._get_mu_converted_for_simulation(),
             end_time=current_time,
@@ -84,8 +84,8 @@ class HawkesTimePredictionModel(TimePredictionModel):
 
         return new_simulated_timestamps
 
-    def _get_alpha_converted_for_simulation(self) -> np.ndarray:
-        return self._parameters["alpha"]
+    def _get_rho_converted_for_simulation(self) -> np.ndarray:
+        return self._parameters["rho"]
 
     def _get_beta_converted_for_simulation(self) -> np.ndarray:
         return self._parameters["beta"]

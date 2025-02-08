@@ -11,7 +11,7 @@ from optimization.lshade import get_initial_random_population, lshade, lshade_sa
 @dataclass
 class TrainedHawkesKernel:
     mu: np.ndarray
-    alphas: np.ndarray
+    rhos: np.ndarray
     betas: np.ndarray
     fitness: float
 
@@ -53,7 +53,7 @@ class MultivariateHawkesTrainerWithLShade:
 
         mu = individual[:num_event_types]
 
-        alphas = individual[
+        rhos = individual[
             num_event_types : num_event_types + num_event_types * num_event_types
         ].reshape(num_event_types, num_event_types)
 
@@ -61,7 +61,7 @@ class MultivariateHawkesTrainerWithLShade:
             num_event_types + num_event_types * num_event_types :
         ].reshape(num_event_types, num_event_types)
 
-        return TrainedHawkesKernel(mu, alphas, betas, fitness)
+        return TrainedHawkesKernel(mu, rhos, betas, fitness)
 
     def get_trained_kernel(self, logs_folder) -> TrainedHawkesKernel:
         initial_population = get_initial_random_population(

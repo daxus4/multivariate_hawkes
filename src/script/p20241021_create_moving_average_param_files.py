@@ -3,8 +3,8 @@ import os
 import pandas as pd
 
 pairs = [
-    # "BTC_USD",
-    # "BTC_USDT",
+    "BTC_USD",
+    "BTC_USDT",
     "ETH_USD",
     "ETH_USDT",
     "ETH_BTC",
@@ -33,7 +33,7 @@ for pair in pairs:
         )
 
         start_simulation_df = pd.read_csv(
-            f"C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\orderbook_changes\\{pair}\\start_simulations.csv"
+            f"C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\orderbook_changes\\{pair}\\start_simulations_sequential_first50.csv"
         )
 
         df = df.merge(

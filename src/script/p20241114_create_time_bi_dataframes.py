@@ -88,7 +88,7 @@ def save_training_df_if_not_exist(
 
     if not os.path.exists(coe_training_dataframe_path):
         lob_df_for_events_training = lob_df_for_events[
-            lob_df_for_events["Timestamp"] < start_simulation_time
+            lob_df_for_events["Timestamp"] < training_time_seconds
         ]
 
         lob_df_for_events_training.to_csv(
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         ) in product(
             loading_info_for_all_dfs,
             coe_conf.bi_levels,
-            coe_conf.training_time_seconds,
+            coe_conf.training_times_seconds,
             coe_conf.simulation_periods_seconds,
         ):
             lob_df_loader = LOBDataLoader()
@@ -175,10 +175,6 @@ if __name__ == "__main__":
                     start_coe_training_time, end_simulation_time
                 )
                 lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
-
-                lob_df_for_events["Timestamp"] = (
-                    lob_df_for_events["Timestamp"] - start_coe_training_time
-                )
 
                 lob_df_for_events = lob_df_for_events[lob_df_for_events["Return"] != 0][
                     ["Timestamp", "BaseImbalance", "Return"]
@@ -197,12 +193,12 @@ if __name__ == "__main__":
                 )
 
                 lob_df_for_events_simulation = lob_df_for_events[
-                    (lob_df_for_events["Timestamp"] >= start_simulation_time)
-                    & (lob_df_for_events["Timestamp"] < end_simulation_time)
+                    (lob_df_for_events["Timestamp"] >= training_time_seconds)
+                    & (
+                        lob_df_for_events["Timestamp"]
+                        < (training_time_seconds + simulation_period_seconds)
+                    )
                 ]
-                lob_df_for_events_simulation["Timestamp"] = (
-                    lob_df_for_events_simulation["Timestamp"] - start_simulation_time
-                )
 
                 simulation_methods_pair_params_dirs = (
                     get_simulation_methods_pair_params_dirs(pair)
@@ -215,7 +211,9 @@ if __name__ == "__main__":
 
                     simulation_df = pd.read_csv(
                         os.path.join(
-                            simulation_method_pair_params_dir, simulation_filename
+                            simulation_method_pair_params_dir,
+                            "simulation_seconds_120",
+                            simulation_filename,
                         ),
                         sep="\t",
                     )
@@ -241,7 +239,8 @@ if __name__ == "__main__":
                         simulation_method,
                         pair,
                         training_params,
-                        f"simulation_seconds_{simulation_period_seconds}",
+                        str(simulation_period_seconds),
+                        f"bi_level_{bi_level}",
                     )
 
                     if not os.path.exists(coe_simulation_dataframe_folder):

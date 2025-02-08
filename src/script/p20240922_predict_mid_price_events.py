@@ -162,7 +162,7 @@ if __name__ == "__main__":
                     os.path.join(simulated_params_dir, d)
                     for d in os.listdir(simulated_params_dir)
                     if os.path.isdir(os.path.join(simulated_params_dir, d))
-                    and "lshade_logged_training" in d
+                    # and "lshade_training" in d
                 ]
 
                 for simulated_params_subdir in simulated_params_subdirs:
@@ -190,39 +190,46 @@ if __name__ == "__main__":
                         testing_conf.seconds_warm_up_period,
                     )
 
-                    event_type_predicted_events_map = (
-                        time_prediction_tester.get_predicted_event_times()
-                    )
-                    event_type_real_events_map = (
-                        time_prediction_tester.get_event_type_real_event_times_map()
-                    )
+                    try:
+                        event_type_predicted_events_map = (
+                            time_prediction_tester.get_predicted_event_times()
+                        )
+                        event_type_real_events_map = (
+                            time_prediction_tester.get_event_type_real_event_times_map()
+                        )
 
-                    predicted_array = event_type_predicted_events_map[
-                        "MID_PRICE_CHANGE"
-                    ]
-                    real_array = event_type_real_events_map["MID_PRICE_CHANGE"]
+                        predicted_array = event_type_predicted_events_map[
+                            "MID_PRICE_CHANGE"
+                        ]
+                        real_array = event_type_real_events_map["MID_PRICE_CHANGE"]
 
-                    df = pd.DataFrame(
-                        {"real": real_array, "predicted": predicted_array}
-                    )
+                        df = pd.DataFrame(
+                            {"real": real_array, "predicted": predicted_array}
+                        )
 
-                    simulations_dir = os.path.join(
-                        CONST.SIMULATIONS_FOLDER,
-                        run_info.model_name,
-                        testing_conf.pair,
-                        os.path.basename(os.path.normpath(simulated_params_subdir)),
-                        f"simulation_seconds_{testing_conf.seconds_simulation_period}",
-                    )
+                        simulations_dir = os.path.join(
+                            CONST.SIMULATIONS_FOLDER,
+                            run_info.model_name,
+                            testing_conf.pair,
+                            os.path.basename(os.path.normpath(simulated_params_subdir)),
+                            f"simulation_seconds_{testing_conf.seconds_simulation_period}",
+                        )
 
-                    if not os.path.exists(simulations_dir):
-                        os.makedirs(simulations_dir)
+                        if not os.path.exists(simulations_dir):
+                            os.makedirs(simulations_dir)
 
-                    prefix = os.path.basename(loading_info.path)
-                    prefix = os.path.splitext(prefix)[0]
-                    prefix = os.path.join(simulations_dir, prefix)
+                        prefix = os.path.basename(loading_info.path)
+                        prefix = os.path.splitext(prefix)[0]
+                        prefix = os.path.join(simulations_dir, prefix)
 
-                    df.to_csv(
-                        os.path.join(f"{prefix}_{start_simulation_time}.tsv"),
-                        index=False,
-                        sep="\t",
-                    )
+                        df.to_csv(
+                            os.path.join(f"{prefix}_{start_simulation_time}.tsv"),
+                            index=False,
+                            sep="\t",
+                        )
+
+                    except Exception as e:
+                        print(e)
+                        print(
+                            f"{simulated_params_subdir} start_simulation_time {start_simulation_time} failed"
+                        )
