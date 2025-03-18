@@ -28,12 +28,12 @@ for pair in pairs:
         os.makedirs(params_path, exist_ok=True)
 
         df = pd.read_csv(
-            f"C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\trained_params\\univariate_hawkes_new_data\\{pair}\\hawkes_decay_10min.tsv",
+            f"C:\\Users\\Admin\\Desktop\\hawkes\\decay_df\\best_density\\{pair}\\hawkes_decay_10min.tsv",
             sep="\t",
         )
 
         start_simulation_df = pd.read_csv(
-            f"C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\orderbook_changes\\{pair}\\start_simulations_sequential_first50.csv"
+            f"C:\\Users\\Admin\\OneDrive - Politecnico di Milano\\phd\\dati\\hawkes\\orderbook_changes\\{pair}\\best_densities_full.csv"
         )
 
         df = df.merge(

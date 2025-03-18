@@ -166,8 +166,8 @@ def loglikelihood(
 
 
 @njit
-def l1_penalty(alphas: np.ndarray, regularization_param: float) -> float:
-    return regularization_param * (np.sum(np.abs(alphas)))
+def l1_penalty(rhos: np.ndarray, regularization_param: float) -> float:
+    return regularization_param * (np.sum(np.abs(rhos)))
 
 
 @njit

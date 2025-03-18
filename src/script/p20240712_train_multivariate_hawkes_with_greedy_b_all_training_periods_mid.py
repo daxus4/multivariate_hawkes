@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Dict, List
 
 import numpy as np
@@ -70,7 +71,6 @@ def get_event_type_times_maps_filtered(
         for event_type_times in event_type_times_map
     ]
 
-
 if __name__ == "__main__":
     multivariate_hawkes_training_conf_map = get_conf(
         os.path.join(
@@ -106,9 +106,11 @@ if __name__ == "__main__":
     )
 
     training_time_file_likelihood_map = {
-        training_time: {"file": [], "likelihood": []}
+        training_time: {"file": [], "score": []}
         for training_time in training_conf.seconds_in_a_period
     }
+
+    training_times_cpu = []
 
     for loading_info in loading_info_for_all_dfs:
         lob_df_loader = LOBDataLoader()
@@ -163,9 +165,14 @@ if __name__ == "__main__":
                     event_type_times_formatted_in_seconds,
                     multivariate_hawkes_training_conf.betas_to_train,
                 )
+                start_time = time.process_time()
                 hawkes_kernel = trainer.get_trained_kernel(
                     multivariate_hawkes_training_conf.beta_values_to_test
                 )
+                end_time = time.process_time()
+                training_times_cpu.append(end_time - start_time)
+
+                print(hawkes_kernel.score())
 
                 params_dir = os.path.join(
                     CONST.TRAINED_PARAMS_FOLDER,
@@ -185,19 +192,26 @@ if __name__ == "__main__":
                     f"{prefix}_{start_simulation_time}"
                 )
                 training_time_file_likelihood_map[training_time_seconds][
-                    "likelihood"
+                    "score"
                 ].append(hawkes_kernel.score())
 
                 np.savetxt(
                     f"{prefix}_{start_simulation_time}_mu.txt", hawkes_kernel.baseline
                 )
                 np.savetxt(
-                    f"{prefix}_{start_simulation_time}_alpha.txt",
+                    f"{prefix}_{start_simulation_time}_rho.txt",
                     hawkes_kernel.adjacency,
                 )
                 np.savetxt(
                     f"{prefix}_{start_simulation_time}_beta.txt", hawkes_kernel.decays
                 )
+
+                with open(
+                    os.path.join(params_dir, "times.txt"), "w"
+                ) as file:
+                    file.writelines(
+                        f"{item}\n" for item in training_times_cpu
+                    )
 
     for training_time_seconds in training_conf.seconds_in_a_period:
         params_dir = os.path.join(

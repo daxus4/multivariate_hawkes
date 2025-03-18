@@ -32,7 +32,6 @@ class MultivariateHawkesTrainerWithGreedyBetaSearch:
                     current_beta = current_betas_matrix[i, j]
 
                     if current_beta < beta_for_null_alpha:
-                        print(f"Checking {i} -> {j} with decay {current_beta}")
                         best_local_decay = current_beta
                         best_local_score = best_score
                         best_local_kernel = current_hawkes_kernel
@@ -58,7 +57,7 @@ class MultivariateHawkesTrainerWithGreedyBetaSearch:
     def _get_hawkes_exp_kernel(
         self, beta_matrix: np.ndarray, timestamps: List[List[np.ndarray]]
     ) -> HawkesExpKern:
-        kernel = HawkesExpKern(beta_matrix, penalty='l1')
+        kernel = HawkesExpKern(beta_matrix, penalty="l1")
         kernel.fit(timestamps)
 
         return kernel

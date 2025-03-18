@@ -12,21 +12,22 @@ from src.conf.testing.testing_conf import TestingConf
 from src.conf.training.model.multivariate_hawkes_training_conf import (
     MultivariateHawkesTrainingConf,
 )
-from src.events_extractor.multivariate_lob_events_extractor import (
-    MultivariateLOBEventsExtractor,
-)
 from src.lob_data_loader.loading_info_getter import LoadingInfoGetter
 from src.lob_data_loader.lob_data_loader import LOBDataLoader
 from src.lob_period.lob_period_extractor import LOBPeriodExtractor
 from src.multivariate_hawkes_training.lob_event_combinator import LOBEventCombinator
 from src.parser.predict_events_parser import PredictEventParser
 from src.parser.predict_events_run_info import PredictEventsRunInfo
+from src.script.p20240712_train_multivariate_hawkes_with_greedy_b_all_training_periods_onlyhawk import (
+    extract_lob_events,
+)
+from time_prediction_model.hawkes_time_prediction_model import HawkesTimePredictionModel
 from time_prediction_model.period_for_simulation import PeriodForSimulation
 from time_prediction_model.time_prediction_model_factory.time_prediction_model_factory import (
     TimePredictionModelFactory,
 )
-from time_prediction_tester.every_time_prediction_tester import (
-    EveryTimePredictionTester,
+from time_prediction_tester.every_time_prediction_tester_multivariate import (
+    EveryTimePredictionTesterMultivariate,
 )
 
 
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     run_info_db_path = parser.parse()
     run_info_db = pd.read_csv(run_info_db_path, sep="\t")
 
-    cpu_times = []
+    testing_cpu_times = []
     for row in run_info_db.itertuples(index=False):
         print(row)
         run_info = PredictEventsRunInfo.from_namedtuple(row)
@@ -113,108 +114,83 @@ if __name__ == "__main__":
             lob_period_extractor = LOBPeriodExtractor(lob_df)
 
             for start_simulation_time in loading_info.start_times:
-                start_warmup_time = (
-                    start_simulation_time - testing_conf.seconds_warm_up_period
-                )
-                end_simulation_time = (
-                    start_simulation_time + testing_conf.seconds_simulation_period
-                )
-
-                lob_period = lob_period_extractor.get_lob_period(
-                    start_warmup_time, end_simulation_time
-                )
-                lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
-
-                lob_df_for_events["Timestamp"] = lob_df_for_events["Timestamp"] * 1000
-
-                lob_events_extractor = MultivariateLOBEventsExtractor(
-                    lob_df_for_events,
-                    events_conf.num_levels_in_a_side,
-                    events_conf.num_levels_for_which_save_events,
-                )
-
-                event_type_times_map = lob_events_extractor.get_events()
-                event_type_times_map = {
-                    key.name: value for key, value in event_type_times_map.items()
-                }
-
-                event_type_times_maps = get_event_type_times_maps_with_combined_types(
-                    event_type_times_map, events_conf.combined_event_types_map
-                )
-
-                event_type_times_maps = get_event_type_times_maps_filtered(
-                    event_type_times_maps, events_conf.events_to_compute
-                )
-
-                event_type_times_maps_formatted_in_seconds = [
-                    {
-                        event_type: (times / 1000)
-                        for event_type, times in event_type_times_map.items()
-                    }
-                    for event_type_times_map in event_type_times_maps
-                ]
-
-                simulated_params_dir = os.path.join(
-                    CONST.TRAINED_PARAMS_FOLDER,
-                    run_info.model_name,
-                    testing_conf.pair,
-                )
-
-                simulated_params_subdirs = [
-                    os.path.join(simulated_params_dir, d)
-                    for d in os.listdir(simulated_params_dir)
-                    if os.path.isdir(os.path.join(simulated_params_dir, d))
-                    # and "lshade_training" in d
-                ]
-
-                for simulated_params_subdir in simulated_params_subdirs:
-                    time_prediction_model_factory = TimePredictionModelFactory(
-                        run_info.model_name,
-                        30,
-                        simulated_params_subdir,
-                        loading_info.start_registration_time,
-                        start_simulation_time,
+                try:
+                    start_warmup_time = (
+                        start_simulation_time - testing_conf.seconds_warm_up_period
+                    )
+                    end_simulation_time = (
+                        start_simulation_time + testing_conf.seconds_simulation_period
                     )
 
-                    time_prediction_model = time_prediction_model_factory.get_model()
+                    lob_period = lob_period_extractor.get_lob_period(
+                        start_warmup_time, end_simulation_time
+                    )
+                    lob_df_for_events = lob_period.get_lob_df_with_timestamp_column()
 
-                    period_for_simulation = PeriodForSimulation(
-                        event_type_event_times_map=event_type_times_maps_formatted_in_seconds[
-                            0
-                        ],
-                        event_types_to_predict=["MID_PRICE_CHANGE"],
-                        event_types_order=events_conf.events_to_compute,
+                    event_type_times_maps_formatted_in_seconds = [
+                        extract_lob_events(lob_df_for_events)
+                    ]
+
+                    simulated_params_dir = os.path.join(
+                        CONST.TRAINED_PARAMS_FOLDER,
+                        run_info.model_name + "_bid_ask",
+                        testing_conf.pair,
                     )
 
-                    time_prediction_tester = EveryTimePredictionTester(
-                        time_prediction_model,
-                        period_for_simulation,
-                        testing_conf.seconds_warm_up_period,
-                    )
+                    simulated_params_subdirs = [
+                        os.path.join(simulated_params_dir, d)
+                        for d in os.listdir(simulated_params_dir)
+                        if os.path.isdir(os.path.join(simulated_params_dir, d))
+                    ]
 
-                    try:
-                        start_cpu_time = time.process_time()
-                        event_type_predicted_events_map = (
-                            time_prediction_tester.get_predicted_event_times()
-                        )
-                        end_cpu_time = time.process_time()
-
-                        cpu_times.append((end_cpu_time - start_cpu_time) / len(event_type_predicted_events_map["MID_PRICE_CHANGE"]))
-                        event_type_real_events_map = (
-                            time_prediction_tester.get_event_type_real_event_times_map()
+                    for simulated_params_subdir in simulated_params_subdirs:
+                        time_prediction_model_factory = TimePredictionModelFactory(
+                            run_info.model_name,
+                            30,
+                            simulated_params_subdir,
+                            loading_info.start_registration_time,
+                            start_simulation_time,
                         )
 
-                        predicted_array = event_type_predicted_events_map[
-                            "MID_PRICE_CHANGE"
-                        ]
-                        real_array = event_type_real_events_map["MID_PRICE_CHANGE"]
-
-                        df = pd.DataFrame(
-                            {"real": real_array, "predicted": predicted_array}
+                        time_prediction_model: HawkesTimePredictionModel = (
+                            time_prediction_model_factory.get_model()
                         )
+
+                        period_for_simulation = PeriodForSimulation(
+                            event_type_times_maps_formatted_in_seconds[0],
+                            ["MID_PRICE_UP", "MID_PRICE_DOWN"],
+                            events_conf.events_to_compute,
+                        )
+
+                        tester = EveryTimePredictionTesterMultivariate(
+                            time_prediction_model,
+                            period_for_simulation,
+                            testing_conf.seconds_warm_up_period,
+                        )
+
+                        start_time = time.process_time()
+                        predictions_df = tester.get_multivariate_predictions()
+                        end_time = time.process_time()
+                        testing_cpu_times.append((end_time - start_time)/len(predictions_df.index))
+
+                        mid_price_change_lob_df = lob_df_for_events[
+                            (lob_df_for_events["Return"] != 0)
+                            & (
+                                lob_df_for_events["Timestamp"]
+                                > testing_conf.seconds_warm_up_period
+                            )
+                        ].reset_index(drop=True)
+
+                        predictions_df = predictions_df.merge(
+                            mid_price_change_lob_df[["Timestamp", "Return"]],
+                            left_on="Real Event Time",
+                            right_on="Timestamp",
+                            how="inner",
+                        )
+                        predictions_df = predictions_df.drop(columns=["Timestamp"])
 
                         simulations_dir = os.path.join(
-                            CONST.SIMULATIONS_FOLDER,
+                            CONST.SIMULATIONS_FOLDER + "_multivariate",
                             run_info.model_name,
                             testing_conf.pair,
                             os.path.basename(os.path.normpath(simulated_params_subdir)),
@@ -228,19 +204,18 @@ if __name__ == "__main__":
                         prefix = os.path.splitext(prefix)[0]
                         prefix = os.path.join(simulations_dir, prefix)
 
-                        df.to_csv(
+                        predictions_df.to_csv(
                             os.path.join(f"{prefix}_{start_simulation_time}.tsv"),
                             index=False,
                             sep="\t",
                         )
 
-                    except Exception as e:
-                        print(e)
-                        print(
-                            f"{simulated_params_subdir} start_simulation_time {start_simulation_time} failed"
-                        )
+                except Exception as e:
+                    print(e)
 
     with open(
         os.path.join(simulations_dir, "times_simulation.txt"), "w"
     ) as file:
-        file.writelines(f"{item}\n" for item in cpu_times)
+        file.writelines(
+            f"{item}\n" for item in testing_cpu_times
+        )

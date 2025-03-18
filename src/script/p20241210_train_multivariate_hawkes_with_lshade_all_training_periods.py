@@ -22,20 +22,51 @@ from src.multivariate_hawkes_training.multivariate_hawkes_trainer_with_lshade im
     MultivariateHawkesTrainerWithLShade,
 )
 
-gene_lower_boundaries = np.array([0.0] * (3 + 9 + 9))
-gene_upper_boundaries = np.array([1.2] * 3 + [1] * 9 + [101] * 9)
-initial_population_size = 7000
+mu_lower_bound = 0.0
+mu_upper_bound = 1.2
+rho_lower_bound = 0.0
+rho_upper_bound = 1
+beta_lower_bound = 0.0
+beta_upper_bound = 100.0
+
+initial_population_size = 30_000
 max_generations = 250
 memory_size = 70
 p = 0.33
-max_number_fitness_evaluations = 300_000
-regularization_param = 50
-instability_param = 100_000
+max_number_fitness_evaluations = 500_000
+regularization_param = 0
+instability_param = 500
 seed = 444
+number_of_best_individuals_without_neighborhood = 5
+relative_tolerance_for_best_individuals_neighborhood = 0.05
+absolute_tolerance_for_best_individuals_neighborhood = 0.05
 
 
-CONF_EVENTS_FILENAME = "mid_price_change_and_sublevels_events_conf.yml"
+CONF_EVENTS_FILENAME = "mid_price_increase_and_decrease_events_conf.yml"
 CONF_TRAINING_FILENAME = "training_conf.yml"
+
+
+def check_influence(event_x_df, event_y_df, median_offset):
+    influenced_count = 0
+
+    # For each event of type X, check if there is at least one event of type Y within the median offset
+    for _, x_row in event_x_df.iterrows():
+        # Get the time of event X
+        x_time = x_row["Event Time"]
+
+        # Check for events of type Y occurring within the median offset
+        y_in_range = event_y_df[
+            (event_y_df["Event Time"] > x_time)
+            & (event_y_df["Event Time"] < x_time + median_offset)
+        ]
+
+        # If at least one Y event is found within the offset range, count it
+        if not y_in_range.empty:
+            influenced_count += 1
+
+    # Return the proportion of events of type X influenced by event Y
+    proportion_influenced = influenced_count / len(event_x_df)
+    return proportion_influenced
 
 
 def get_conf(path: str) -> Dict:
@@ -145,6 +176,93 @@ if __name__ == "__main__":
                     event_type_times_maps, events_conf.events_to_compute
                 )
 
+                events_df = pd.DataFrame(
+                    [
+                        (k, v)
+                        for k, values in event_type_times_maps[0].items()
+                        for v in values
+                    ],
+                    columns=["Event Type", "Event Time"],
+                )
+                events_df = events_df.sort_values("Event Time", ascending=True)
+                events_df["Offset Shared"] = events_df["Event Time"].diff()
+
+                influence_matrix = pd.DataFrame(
+                    index=events_conf.events_to_compute,
+                    columns=events_conf.events_to_compute,
+                    dtype=float,
+                )
+
+                median_offset = events_df["Offset Shared"].median()
+
+                for event_x in events_conf.events_to_compute:
+                    for event_y in events_conf.events_to_compute:
+                        proportion = check_influence(
+                            events_df[events_df["Event Type"] == event_x],
+                            events_df[events_df["Event Type"] == event_y],
+                            median_offset,
+                        )
+                        influence_matrix.at[event_y, event_x] = proportion
+
+                influence_matrix = influence_matrix.to_numpy()
+
+                correlated_couples = influence_matrix > 0.06
+                correlated_couples = correlated_couples.flatten()
+
+                mu_counts = len(events_conf.events_to_compute)
+                rho_counts = len(events_conf.events_to_compute) ** 2
+                beta_counts = len(events_conf.events_to_compute) ** 2
+
+                lower_bounds = np.concatenate(
+                    (
+                        mu_lower_bound * np.ones(mu_counts),
+                        np.where(
+                            correlated_couples,
+                            rho_lower_bound * np.ones(rho_counts),
+                            np.zeros(rho_counts),
+                        ),
+                        np.where(
+                            correlated_couples,
+                            beta_lower_bound * np.ones(rho_counts),
+                            100 * np.ones(rho_counts),
+                        ),
+                    )
+                )
+
+                upper_bounds = np.concatenate(
+                    (
+                        mu_upper_bound * np.ones(mu_counts),
+                        np.where(
+                            correlated_couples,
+                            rho_upper_bound * np.ones(rho_counts),
+                            np.zeros(rho_counts),
+                        ),
+                        np.where(
+                            correlated_couples,
+                            beta_upper_bound * np.ones(rho_counts),
+                            100 * np.ones(rho_counts),
+                        ),
+                    )
+                )
+
+                fixed_parameters_values = np.concatenate(
+                    (
+                        np.full(len(events_conf.events_to_compute), np.nan),
+                        np.where(
+                            correlated_couples,
+                            np.nan * np.ones(rho_counts),
+                            np.zeros(rho_counts),
+                        ),
+                        np.where(
+                            correlated_couples,
+                            np.nan * np.ones(rho_counts),
+                            beta_upper_bound * np.ones(rho_counts),
+                        ),
+                    )
+                )
+
+                fixed_parameters_values = np.full(mu_counts + rho_counts * 2, np.nan)
+
                 event_type_times_map_formatter = EventTypeTimesMapsFormatter()
 
                 event_type_times_formatted = (
@@ -160,8 +278,8 @@ if __name__ == "__main__":
 
                 trainer = MultivariateHawkesTrainerWithLShade(
                     event_type_times_formatted_in_seconds,
-                    gene_lower_boundaries,
-                    gene_upper_boundaries,
+                    lower_bounds,
+                    upper_bounds,
                     initial_population_size,
                     max_generations,
                     memory_size,
@@ -170,12 +288,13 @@ if __name__ == "__main__":
                     regularization_param,
                     instability_param,
                     training_time_seconds,
+                    fixed_parameters_values,
                 )
                 params_dir = os.path.join(
                     CONST.TRAINED_PARAMS_FOLDER,
                     CONST.MULTIVARIATE_HAWKES,
                     training_conf.pair,
-                    "lshade_training_time_" + str(training_time_seconds),
+                    "lshade_training_time_my_" + str(training_time_seconds),
                 )
 
                 if not os.path.exists(params_dir):
@@ -186,8 +305,10 @@ if __name__ == "__main__":
                 prefix = os.path.join(params_dir, prefix)
 
                 logs_dir = f"{prefix}_{start_simulation_time}_logs"
-                # if not os.path.exists(logs_dir):
-                #    os.makedirs(logs_dir, exist_ok=True)
+                if not os.path.exists(logs_dir):
+                    os.makedirs(logs_dir, exist_ok=True)
+
+                np.savetxt(f"{logs_dir}\\fixed_params.txt", fixed_parameters_values)
 
                 hawkes_kernel = trainer.get_trained_kernel(logs_dir)
 
@@ -211,7 +332,7 @@ if __name__ == "__main__":
             CONST.TRAINED_PARAMS_FOLDER,
             CONST.MULTIVARIATE_HAWKES,
             training_conf.pair,
-            "lshade_training_time_" + str(training_time_seconds),
+            "lshade_training_time_my_" + str(training_time_seconds),
         )
         with open(
             os.path.join(params_dir, CONST.ORDER_OF_EVENT_TYPES_FILE), "w"
