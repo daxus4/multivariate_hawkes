@@ -57,7 +57,7 @@ class MultivariateHawkesTrainerWithGreedyBetaSearch:
     def _get_hawkes_exp_kernel(
         self, beta_matrix: np.ndarray, timestamps: List[List[np.ndarray]]
     ) -> HawkesExpKern:
-        kernel = HawkesExpKern(beta_matrix, penalty="l1")
+        kernel = HawkesExpKern(beta_matrix, gofit="likelihood", penalty="l1")
         kernel.fit(timestamps)
 
         return kernel
